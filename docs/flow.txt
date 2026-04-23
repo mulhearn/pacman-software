@@ -1,0 +1,133 @@
+exit 0 # (in case of accidentally sourcing of this file)
+
+Basic work flows for pacman project
+===================================
+
+Building from repo:
+
+git clone https://github.com/mulhearn/pacman-software.git
+
+or, with ssh:
+
+git clone git@github.com:mulhearn/pacman-software.git
+
+cd pacman
+
+source /tools/Xilinx/Vivado/2023.2/settings64.sh
+
+# connecting to UART
+busybox microcom -s 115200 /dev/ttyUSB1
+# (Use Ctrl-X to exit)
+
+# run hello world demo:
+xsct apps/hello/install.tcl
+cd hello
+xsct run.tcl
+
+# run bare-metal menu application
+xsct apps/menu/install.tcl
+cd menu
+xsct run.tcl
+
+# USAGE NOTE:
+# With some versions of VIVADO, xsct tool under linux hangs occassionally at:
+#
+# $ xsct build.tcl
+# Starting vitis. This could take few seconds...Eclipse:
+# The Eclipse executable launcher no longer supports running with GTK + 2.x. Continuing using GTK+ 3.x.
+# done
+#
+# In this case, you have to kill the hung processes yourself, e.g. like:
+#
+# (Ctrl-c)
+pkill -9 -f eclipse
+
+#building the FSBL: (You'll need this for petalinux packaging!)
+xsct apps/pacman_fsbl/install.tcl
+ls -alh products/pacman_fsbl.elf
+
+#petalinux:
+source /tools/Xilinx/PetaLinux/2023.2/tool/settings.sh
+cd petalinux
+./scripts/create_full.sh
+cd full
+../scripts/config.sh
+../scripts/build.sh
+../scripts/package.sh
+cd images/linux
+ls -alh BOOT.BIN image.ub boot.scr
+
+# put those files on partition 1 (vfat) of an SD card,
+# untar (as root) the rootfs.tar.gz into partion 2 (linux) of an SD card
+
+# building just one user petalinux package (e.g. hwutil/pacman-server):
+../scripts/build_hwutil.sh
+# build tar file from the generated RPM file:
+mkdir tmp
+cd tmp/
+rpm2cpio ../hwutil-latest.rpm | cpio -idmv
+tar -czf ../hwutil-latest.tar.gz ./
+cd ..
+rm -fr tmp
+
+# Booting without an SD card (e.g. for PACMAN 1V4 without SD card support)
+
+U-boot should find image.ub on the onboard MMC just fine as is.  You'll only need to customize the linux kernel (image.ub) by changing
+CONFIG_SUBSYSTEM_SDROOT_DEV="/dev/mmcblk0p2"
+to:
+CONFIG_SUBSYSTEM_SDROOT_DEV="/dev/mmcblk1p2"
+in project-spec/config/config.
+Then return the petalinux flow starting at config step (which will update the BOOTARGs automatically).
+
+Then *both* image.ub and boot.scr go on BOOT partition (/dev/mmcblk1p1)
+And rootfs.tar.gz on the rootfs partition (/dev/mmcblk1p2)
+See next step for how to write QSPI.
+
+# Writing QSPI from Linux (of any zipline firmware package):
+
+root@Trenz:~# cat /proc/mtd
+dev:    size   erasesize  name
+mtd0: 00500000 00010000 "qspi-boot"
+mtd1: 01400000 00010000 "qspi-kernel"
+mtd2: 00020000 00010000 "qspi-bootenv"
+mtd3: 00040000 00010000 "bootscr"
+
+root@Trenz:~# flash_erase /dev/mtd0 0 0
+Erasing 5120 Kibyte @ 0 -- 100 % complete
+root@Trenz:~# dd if=BOOT.BIN of=/dev/mtd0 bs=1M
+3+1 records in
+3+1 records out
+3667980 bytes (3.7 MB, 3.5 MiB) copied, 6.27029 s, 585 kB/s
+root@Trenz:~#
+
+root@Trenz:~# flash_erase /dev/mtd3 0 0
+Erasing 256 Kibyte @ 0 -- 100 % complete
+root@Trenz:~# dd if=boot.scr of=/dev/mtd3 bs=1M
+0+1 records in
+0+1 records out
+3473 bytes (3.5 kB, 3.4 KiB) copied, 0.00778804 s, 446 kB/s
+
+
+# Using devmem
+
+You can read HW registers directly via devmen if you know the correct
+offset.  Here is an example reading the firmware version:
+
+root@Trenz:~# /sbin/devmem 0x4000FF10
+0x00000003
+root@Trenz:~# /sbin/devmem 0x4000FF14
+0x00000004
+root@Trenz:~# /sbin/devmem 0x4000FF18
+0x00000000
+
+#
+# Other Flows (Not Checked Recently...)
+#
+
+# install hello world to qspi flash demo (also shows creating BOOT.bin with bootgen)
+xsct apps/flash/install.tcl
+# you can now copy flash/BOOT.bin onto the BOOT partition of an SD card to boot hello world from SD card, and/or:
+# write BOOT.bin to QSPI flash:
+cd flash
+source program.sh
+# switch to QSPI boot mode (boots hello world)
