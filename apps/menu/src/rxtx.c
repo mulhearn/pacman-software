@@ -290,9 +290,9 @@ void toggle_rx_buffer_config(void){
 
 void toggle_rx_buffer_enables(void){
   static int mode = 0;
-  mode = (mode + 1) % 4;
+  mode = (mode + 1) % 5;
 
-  unsigned config[] = {0x3, 0x0, 0x1, 0x2};
+  unsigned config[] = {0x7, 0x0, 0x1, 0x2, 0x4};
   printf("INFO: Setting RX buffer enables to 0x%08X \r\n", config[mode]);
   axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_BUFFER_ENABLES, config[mode]);
 }
@@ -320,9 +320,10 @@ void read_rx_status(void){
   printf("sync config-----------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_ROLLOVER_CONFIG));
   printf("word_type_lut---------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_WORD_TYPE_LUT));
 
-  printf("heartbeat header------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_HEARTBEAT_HEADER));
-  printf("rollover header-------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_ROLLOVER_HEADER));
-  //printf("trigger header--------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_TRIG_HEADER));
+  printf("header a--------------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_HEADER_A));
+  printf("header b--------------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_HEADER_B));
+  printf("header c--------------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_HEADER_C));
+  printf("header d--------------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_HEADER_D));
   printf("end of packet header--------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_EOP_HEADER));
 }
 

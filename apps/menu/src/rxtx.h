@@ -38,10 +38,11 @@ extern "C" {
 #define C_ADDR_RX_HEARTBEAT_CONFIG  0xC0
 #define C_ADDR_RX_ROLLOVER_CONFIG   0xC4
 #define C_ADDR_RX_WORD_TYPE_LUT     0xC8
-#define C_ADDR_RX_HEARTBEAT_HEADER  0xD0
-#define C_ADDR_RX_ROLLOVER_HEADER   0xD4
-#define C_ADDR_RX_TRIG_HEADER       0xD8
-#define C_ADDR_RX_EOP_HEADER        0xDC
+#define C_ADDR_RX_HEADER_A          0xD0
+#define C_ADDR_RX_HEADER_B          0xD4
+#define C_ADDR_RX_HEADER_C          0xD8
+#define C_ADDR_RX_HEADER_D          0xDC
+#define C_ADDR_RX_EOP_HEADER        0xE0
 
 #define C_ADDR_TX_UART_STATUS   0x00
 #define C_ADDR_TX_UART_CONFIG   0x04
