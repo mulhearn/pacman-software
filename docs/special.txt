@@ -1,0 +1,20 @@
+======================================
+Flows for those special situations....
+======================================
+
+----------------------------------------------------------------------------
+I want to run bare-metal, but my QSPI boot is taking me directly to Linux...
+----------------------------------------------------------------------------
+
+Look around:
+
+$ cat /proc/mtd         
+dev:    size   erasesize  name
+mtd0: 00500000 00010000 "boot"
+mtd1: 00020000 00010000 "bootenv"
+mtd2: 00a80000 00010000 "kernel"
+mtd3: 01060000 00010000 "spare"
+
+Erase the first byte of boot:
+
+$ flash_erase /dev/mtd0 0 1
