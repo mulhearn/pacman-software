@@ -46,7 +46,7 @@ void handle_data(pacman_word_t * req_word, pacman_word_t * rep_word){
   uint32_t payload_lo = req_word->data.payload_lo;
   uint32_t payload_hi = req_word->data.payload_hi;
 
-  printf("INFO:  handling TX request for chan %5d payload 0x%08x%08x \n", chan, payload_hi, payload_lo);
+  //printf("INFO:  handling TX request for chan %5d payload 0x%08x%08x \n", chan, payload_hi, payload_lo);
   uint8_t pacman_id = get_pacman_id();
   if (chan > 0) {
     tx_buffer_in(chan-1, payload_hi, payload_lo);
@@ -112,10 +112,10 @@ int main(int argc, char* argv[]){
   while (1) {
     pacman_poll_tx();
 
-    printf("INFO:  Waiting for new message...\n");
+    //printf("INFO:  Waiting for new message...\n");
     zmq_msg_init(&zmq_req);
     size_t nbytes_recv = zmq_msg_recv(&zmq_req, rep_socket, 0);
-    printf("INFO:  Message received with %zu bytes\n", nbytes_recv);
+    //printf("INFO:  Message received with %zu bytes\n", nbytes_recv);
     if (nbytes_recv < HEADER_BYTES) {
       zmq_msg_close(&zmq_req);
       return 0;  // exit on error
@@ -124,7 +124,7 @@ int main(int argc, char* argv[]){
 
     assert(nbytes_recv <= sizeof(req_msg));
     memcpy(&req_msg, zmq_msg_data(&zmq_req), nbytes_recv);
-    print_msg(&req_msg, "INFO:  ");
+    //print_msg(&req_msg, "INFO:  ");
     assert(nbytes_recv == total_message_size(&req_msg));
 
     if (is_string_msg(&req_msg)){
@@ -185,7 +185,7 @@ int main(int argc, char* argv[]){
     }
 
     // echo the request:
-    printf("INFO:  echoing request\n");
+    //printf("INFO:  echoing request\n");
     msg_ready = false;
     zmq_msg_init_data(&zmq_echo, &req_msg, total_message_size(&req_msg), clear_msg, NULL);
     zmq_msg_send(&zmq_echo, echo_socket, 0);
@@ -196,7 +196,7 @@ int main(int argc, char* argv[]){
     zmq_msg_close(&zmq_req);
 
     // echo our reply:
-    printf("INFO:  echoing reply\n");
+    //printf("INFO:  echoing reply\n");
     msg_ready = false;
     zmq_msg_init_data(&zmq_echo, &rep_msg, total_message_size(&rep_msg), clear_msg, NULL);
     zmq_msg_send(&zmq_echo, echo_socket, 0);
@@ -204,7 +204,7 @@ int main(int argc, char* argv[]){
     zmq_msg_close(&zmq_echo);
 
     // sending our reply message:
-    printf("INFO:  sending reply message\n");
+    //printf("INFO:  sending reply message\n");
     msg_ready = false;
     zmq_msg_init_data(&zmq_rep, &rep_msg, total_message_size(&rep_msg), clear_msg, NULL);
     zmq_msg_send(&zmq_rep, rep_socket, 0);

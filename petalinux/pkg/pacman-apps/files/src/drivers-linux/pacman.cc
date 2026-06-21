@@ -19,6 +19,23 @@
 #include "dma.h"
 #include "rxtx.h"
 
+static unsigned count_rx = 0;
+static unsigned max_rx_pending = 0;
+
+unsigned pacman_packet_count_rx(int clear){
+  unsigned tmp = count_rx;
+  if (clear)
+    count_rx = 0;
+  return tmp;
+}
+
+unsigned pacman_max_rx_pending(int clear){
+  unsigned tmp = max_rx_pending;
+  if (clear)
+    max_rx_pending = 0;
+  return tmp;
+}
+
 volatile uint32_t * G_PACMAN_AXIL = NULL;
 
 //PACMAN SERVER Scratch Registers (Accessible at PACMAN_SERVER_VIRTUAL_START + (0, 1)
@@ -66,7 +83,8 @@ int pacman_init(int verbose){
     printf("INFO:  Setting number of cycles per DMA package to 31 (0x1F) as appropriate for DMA buffer length.\n");
     printf("INFO:  Enabling Trigger, Sync, and Heartbeat words in the RX unit.\n");
   }
-  G_PACMAN_AXIL[0x7FB4>>2] = 0x001F;
+  //G_PACMAN_AXIL[0x7FB4>>2] = 0x001F;
+  G_PACMAN_AXIL[0x7FB4>>2] = 0x02000000;
   G_PACMAN_AXIL[0x7FB8>>2] = 0x0003;
 
   if (verbose){
@@ -140,33 +158,33 @@ int pacman_init_rx(int verbose, int skip_reset){
 
 int pacman_poll_rx(){
   const unsigned rx_trailer_bytes = 24; // current firmware, each DMA RX packet has a 192-bit trailer
-  const unsigned batch_size = 100;
-  unsigned batch_count = 0;
   hw_addr_t nxta;
   uint32_t rx_data[6];
 
-  while((batch_count < batch_size) && dma_next_available_rx_bd(&nxta)){
+  // track maximum of rx buffers pending:
+  unsigned pending = rx_pending();
+  if (pending > max_rx_pending)
+    max_rx_pending = pending;
+
+  while(dma_next_available_rx_bd(&nxta)){
     // several checks are possible here: xbytes size makes sense, trailer matches, etc...
     // but keeping as simple as possible for integration of new driver ...
     unsigned xbytes = dma_poll_bd_transferred(nxta);
     hw_ptr_t rx_buf = dma_get_buffer(nxta);
     if (xbytes > rx_trailer_bytes) {
       unsigned full_words = (xbytes - rx_trailer_bytes) / 24;
-      for (unsigned i=0; i<full_words; i++){
-	rx_data[0] = rx_buf[6*i+0];
-	rx_data[1] = rx_buf[6*i+1];
-	rx_data[2] = rx_buf[6*i+2];
-	rx_data[3] = rx_buf[6*i+3];
-	rx_data[4] = rx_buf[6*i+4];
-	rx_data[5] = rx_buf[6*i+5];
-	rx_buffer_in(rx_data);
-      }
+      count_rx += full_words;
+      //for (unsigned i=0; i<full_words; i++){
+      //rx_data[0] = rx_buf[6*i+0];
+      //rx_data[1] = rx_buf[6*i+1];
+      //rx_data[2] = rx_buf[6*i+2];
+      //rx_data[3] = rx_buf[6*i+3];
+      //rx_data[4] = rx_buf[6*i+4];
+      //rx_data[5] = rx_buf[6*i+5];
+      //rx_buffer_in(rx_data);
+      //}
     }
-    batch_count++;
     dma_add_rx_bd(nxta);
-  }
-  if (batch_count > 0){
-    printf("INFO:  returning %d RX buffers \r\n", batch_count);
     dma_rx_batch();
   }
   return EXIT_SUCCESS;

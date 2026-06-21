@@ -79,6 +79,7 @@ unsigned rx_buffer_out(uint32_t * dst){
 
   unsigned tail = G_TAIL;
 
+  dst[0] = G_DATA[tail][0];
   for (int i=0; i<RX_BUFFER_WORDS; i++){
     dst[i] = G_DATA[tail][i];
   }
