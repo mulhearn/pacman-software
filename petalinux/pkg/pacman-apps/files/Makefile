@@ -22,8 +22,13 @@ $(LINUX_SRCS:$(SRC_DIR)/drivers-linux/%.cc=$(OBJ_DIR)/%.o)
 
 # Flags
 CPPFLAGS := $(INCLUDE_DIRS) -D_LINUX
-CXXFLAGS := -Wall -O2
-CFLAGS   := -Wall -O2
+# turn off optimatization entirely for debugging:
+#CXXFLAGS := -Wall -O0 -g
+#CFLAGS   := -Wall -O0 -g
+# petalinux optimization level is O2:
+CXXFLAGS := -Wall -O2 -g
+CFLAGS   := -Wall -O2 -g
+
 #LDLIBS   := $(LIB_DIR)/$(LIB_NAME) -lzmq -lstdc++
 LDLIBS   := -lzmq -lstdc++
 
