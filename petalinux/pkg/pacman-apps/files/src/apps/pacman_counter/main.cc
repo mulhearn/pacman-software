@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cassert>
 #include <sys/time.h>
+#include <signal.h>
 
 #define REPORT_INTERVAL_MS 10000
 #define SOCKET_B_BINDING_SUB "tcp://localhost:5556"
@@ -14,7 +15,13 @@
 #define MAX_BUFFER_SIZE 1048576
 uint32_t rx_buffer[MAX_BUFFER_SIZE/4];
 
+volatile bool running = true;
+void signal_handler(int) { running = false; }
+
 int main(int argc, char* argv[]){
+  signal(SIGINT, signal_handler);
+  signal(SIGTERM, signal_handler);
+
   // timers and counters:
   struct timeval start, window_start, now;
   uint32_t packets[MAX_CHANNEL];
@@ -48,7 +55,7 @@ int main(int argc, char* argv[]){
 
   gettimeofday(&start, NULL);
   gettimeofday(&window_start, NULL);
-  while(1){
+  while(running){
     gettimeofday(&now, NULL);
     double window_ms     = 1000.0*(now.tv_sec - window_start.tv_sec) + (now.tv_usec - window_start.tv_usec)/1000.0;
     if (window_ms >= REPORT_INTERVAL_MS) {
@@ -116,27 +123,16 @@ int main(int argc, char* argv[]){
 	total_packets++;
 	window_packets++;
       } else {
-	printf("INFO:  packet: 0x %08x %08x %08x %08x %08x %08x\n",
-	       rx_buffer[6+6*i+5], rx_buffer[6+6*i+4],
-	       rx_buffer[6+6*i+3], rx_buffer[6+6*i+2],
-	       rx_buffer[6+6*i+1], rx_buffer[6+6*i+0]);
+	//printf("INFO:  packet: 0x %08x %08x %08x %08x %08x %08x\n",
+	//       rx_buffer[6+6*i+5], rx_buffer[6+6*i+4],
+	//       rx_buffer[6+6*i+3], rx_buffer[6+6*i+2],
+	//       rx_buffer[6+6*i+1], rx_buffer[6+6*i+0]);
       }
     }
-    //printf("INFO:  received packet counts per channel:\n");
-    //for (int i=0; i<MAX_CHANNEL; i++){
-    //  printf("%8d ", packets[i]);
-    //  if (((i+1)%8)==0)
-    //printf("\n");
-    //}
   }
-  //gettimeofday(&end, NULL);
-  //elapsed_time = 1000.0*(end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000.0;
-  //printf("INFO: rx_count: %d\n", rx_count);
-  //printf("INFO: time (ms): %lf\n", elapsed_time);
-  //printf("INFO: total words: %d  errors: %d\n", tot_words, err_words);
-  //uint64_t data = rx_count * MAX_BUFFER_SIZE;
-  //double mbts = data*1000/(elapsed_time*1024*1024);
-  //printf("INFO: bytes:     %lu\n", data);
-  //printf("INFO: mbts:      %lf\n", mbts);
+  zmq_close(sub);
+  zmq_ctx_term(ctx);
+  printf("INFO:  Shutting down.\n");
   return 0;
+
 }

@@ -11,7 +11,6 @@
 #include "pacman_vspace.hh"
 #include "pacman_highlevel_interface.hh"
 #include "tx_buffer.hh"
-#include "rx_buffer.hh"
 
 #define PUB_SOCKET_BINDING "tcp://*:5557"
 #define SUB_SOCKET_BINDING "tcp://localhost:5557"
@@ -19,15 +18,14 @@
 static void * pub = NULL;
 static void * sub = NULL;
 
-#define MAX_PACKETS 10000
+#define MAX_PACKETS 1000
 #define BYTES_PER_PACKET 24
-#define WORDS_PER_PACKET 6    // 32 bytes / 4 bytes per 32-bit word
 
 static uint32_t buffer[MAX_PACKETS*BYTES_PER_PACKET/4];
+
 static volatile bool msg_done = true;
 
 static unsigned count_rx = 0;
-
 unsigned pacman_packet_count_rx(int clear){
   unsigned tmp = count_rx;
   if (clear)
@@ -102,12 +100,17 @@ int pacman_init_tx(int verbose, int skip_reset){
   return EXIT_SUCCESS;
 }
 
-int pacman_poll_rx(){
-  static uint32_t buffer[4*MAX_PACKETS];
+void pacman_poll_rx(pacman_word_t * buffer, unsigned * index, unsigned max){
   int rc;
 
   // keep reading messages until we timeout waiting:
   while(1){
+
+    // check that we have enough space for an entire message:
+    if ((max - *index) < MAX_PACKETS)
+      return;
+
+
     zmq_msg_t msg;
     rc = zmq_msg_init(&msg);
     assert(rc==0);
@@ -116,29 +119,23 @@ int pacman_poll_rx(){
 
     if (size <= 0){
       zmq_msg_close(&msg);
-      return EXIT_SUCCESS;
+      return;
     }
 
     if (size % BYTES_PER_PACKET) {
-      printf("ERROR:  received message of size %d\n", size);
-      return EXIT_FAILURE;
+      perror("ERROR: invalid message size received.\n");
+      abort();
     }
 
-
     int count = size / BYTES_PER_PACKET;
-
     count_rx += count;
 
     //printf("DEBUG:  received %d words in buffer of size %d \n", count, size);
-    memcpy(buffer,zmq_msg_data(&msg), size);
+    memcpy(&buffer[*index],zmq_msg_data(&msg), size);
+    *index += count;
+
     zmq_msg_close(&msg);
 
-    for (int i=0; i<count; i++){
-      rx_buffer_in(&buffer[WORDS_PER_PACKET*i]);
-    }
-
-
-    return EXIT_SUCCESS;
   }
 }
 

@@ -11,7 +11,6 @@
 #include "addr_conf.hh"
 #include "pacman.hh"
 #include "tx_buffer.hh"
-#include "rx_buffer.hh"
 #include "pacman_i2c.hh"
 
 // new common drivers:
@@ -156,38 +155,36 @@ int pacman_init_rx(int verbose, int skip_reset){
   return EXIT_SUCCESS;
 }
 
-int pacman_poll_rx(){
+void pacman_poll_rx(pacman_word_t * buffer, unsigned * index, unsigned max){
   const unsigned rx_trailer_bytes = 24; // current firmware, each DMA RX packet has a 192-bit trailer
   hw_addr_t nxta;
-  uint32_t rx_data[6];
 
   // track maximum of rx buffers pending:
   unsigned pending = rx_pending();
   if (pending > max_rx_pending)
     max_rx_pending = pending;
 
-  while(dma_next_available_rx_bd(&nxta)){
-    // several checks are possible here: xbytes size makes sense, trailer matches, etc...
-    // but keeping as simple as possible for integration of new driver ...
+  while (1) {
+    // check that there is enough space for a maximially filled DMA buffer:
+    const unsigned max_words_per_bd = (RX_BUF_BYTES - rx_trailer_bytes) / 24;
+    if ((max - *index) < max_words_per_bd)
+      return;
+
+    if (!dma_next_available_rx_bd(&nxta))
+      return;
+
     unsigned xbytes = dma_poll_bd_transferred(nxta);
     hw_ptr_t rx_buf = dma_get_buffer(nxta);
-    if (xbytes > rx_trailer_bytes) {
-      unsigned full_words = (xbytes - rx_trailer_bytes) / 24;
-      count_rx += full_words;
-      //for (unsigned i=0; i<full_words; i++){
-      //rx_data[0] = rx_buf[6*i+0];
-      //rx_data[1] = rx_buf[6*i+1];
-      //rx_data[2] = rx_buf[6*i+2];
-      //rx_data[3] = rx_buf[6*i+3];
-      //rx_data[4] = rx_buf[6*i+4];
-      //rx_data[5] = rx_buf[6*i+5];
-      //rx_buffer_in(rx_data);
-      //}
-    }
+
+    assert(xbytes > rx_trailer_bytes);
+    assert((xbytes - rx_trailer_bytes) % 24 == 0);
+    unsigned packets = (xbytes - rx_trailer_bytes) / 24;
+    count_rx += packets;
+    memcpy(&buffer[*index], (void*)rx_buf, xbytes - rx_trailer_bytes);
+    *index += packets;
     dma_add_rx_bd(nxta);
     dma_rx_batch();
   }
-  return EXIT_SUCCESS;
 }
 
 int pacman_poll_tx(){
