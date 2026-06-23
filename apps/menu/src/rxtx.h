@@ -100,6 +100,8 @@ void rx_disable_uart(unsigned chan);
 void rx_enable_uart(unsigned chan);
 bool rx_uart_is_enabled(unsigned chan);
 
+unsigned rx_pending(void);
+
 // menu hooks:
 void read_tx_status(void);
 void read_tx_look(void);

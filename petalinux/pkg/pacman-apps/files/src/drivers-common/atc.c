@@ -100,7 +100,7 @@ void read_atc_counts(){
 void toggle_atc_destinations(){
 
   static int mode = 0;
-  mode = (mode + 1) % 4;
+  mode = (mode + 1) % 5;
   if (mode == 0) {
     printf("INFO:  setting all destinations to zero (no output) \r\n");
     axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_LEMO_A,  0x0);
@@ -129,6 +129,17 @@ void toggle_atc_destinations(){
     axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_LEMO_B,  0x0);
     axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_POKE_C,  0x03FF0011);
     axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_POKE_D,  0x03FF0014);
+    axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_LOGIC_E, 0x0);
+    axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_LOGIC_F, 0x0);
+    wait_atc_busy(C_ATC_BUSY_WAIT);
+    axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_CONFIG_REQ, 0x0);
+    wait_atc_busy(C_ATC_BUSY_WAIT);
+  } else if (mode == 3) {
+    printf("configure timing for POKE C -> G POKE D -> M \r\n");
+    axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_LEMO_A,  0x0);
+    axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_LEMO_B,  0x0);
+    axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_POKE_C,  0x03FF0011);
+    axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_POKE_D,  0xF3FF001A);
     axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_LOGIC_E, 0x0);
     axil_write_register(C_SCOPE_ATC+C_ADDR_ATC_DST_LOGIC_F, 0x0);
     wait_atc_busy(C_ATC_BUSY_WAIT);

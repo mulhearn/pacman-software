@@ -21,7 +21,7 @@ void atc_menu(){
       printf("invalid selection...\r\n");
     case 's':
       set_atc_default_config();
-      break;      
+      break;
     case 'r':
       read_atc_registers();
       break;

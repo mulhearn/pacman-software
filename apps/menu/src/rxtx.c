@@ -9,7 +9,9 @@
 hw_val_t tx_mask_b = 0xFF;
 hw_val_t tx_mask_a = 0xFFFFFFFF;
 
-static unsigned G_TX_COUNTER = 0;
+static unsigned tx_counter = 0;
+static unsigned tx_ring_size = 0;
+static unsigned rx_ring_size = 0;
 
 void init_rxtx(void){
   dma_platform_init();
@@ -20,6 +22,9 @@ void init_rxtx(void){
 
 void init_tx_descriptor_ring_mode(int ring_size){
   printf("INFO:  initializing TX BD ring:\r\n");
+
+  tx_ring_size = ring_size;
+
   dma_init_bd_ring(TX_BD_BASEADDR, ring_size, TX_PACKET_BYTES, DMA_BD_CONTROL_SOF | DMA_BD_CONTROL_EOF, DMA_BD_STATUS_COMPLETE);
 
   dma_write_tx_curdesc(TX_BD_BASEADDR);
@@ -36,6 +41,9 @@ void init_tx_descriptor_ring_mode(int ring_size){
 
 void init_rx_descriptor_ring_mode(int ring_size){
   printf("INFO:  initializing RX BD ring:\r\n");
+
+  rx_ring_size = ring_size;
+
   dma_init_bd_ring(RX_BD_BASEADDR, ring_size, RX_BUF_BYTES, 0, 0);
 
   dma_write_rx_curdesc(dma_get_next_bd_addr(RX_BD_BASEADDR));
@@ -65,6 +73,15 @@ void show_rxtx_bds(void){
 void show_rxtx_head_tail(void){
   dma_show_tx_current_tail_addrs();
   dma_show_rx_current_tail_addrs();
+}
+
+unsigned rx_pending(void) {
+  hw_addr_t current = dma_read_rx_curdesc();
+  hw_addr_t tail    = dma_read_rx_taildesc();
+  if (current >= tail)
+    return (current - tail) / DMA_BD_BYTES;
+  else
+    return (current - tail + rx_ring_size * DMA_BD_BYTES) / DMA_BD_BYTES;
 }
 
 void clear_rxtx_ioc(void){
@@ -104,8 +121,8 @@ void single_tx(void){
   tx_buf[1]= tx_mask_b;
 
   for (int i=0; i<TX_PAYLOAD_U32_WORDS; i++)
-    tx_buf[i+TX_HEADER_U32_WORDS] = 0xB000F000 + i + (G_TX_COUNTER<<16);
-  G_TX_COUNTER++;
+    tx_buf[i+TX_HEADER_U32_WORDS] = 0xB000F000 + i + (tx_counter<<16);
+  tx_counter++;
 
   HW_FLUSH_DCACHE(tx_buf, TX_PACKET_BYTES);
   dma_clear_tx_ioc();
@@ -143,12 +160,12 @@ void batch_tx(void){
     tx_buf[1]= tx_mask_b;
 
     for (int i=0; i<TX_PAYLOAD_U32_WORDS; i++)
-      tx_buf[i+TX_HEADER_U32_WORDS] = 0xB000F000 + i + (G_TX_COUNTER<<16);
+      tx_buf[i+TX_HEADER_U32_WORDS] = 0xB000F000 + i + (tx_counter<<16);
     HW_FLUSH_DCACHE(tx_buf, TX_PACKET_BYTES);
 
     dma_add_tx_bd(nxta);
     count++;
-    G_TX_COUNTER++;
+    tx_counter++;
   }
 
   dma_clear_tx_ioc();
@@ -200,7 +217,7 @@ void toggle_tx_config(void){
     printf("INFO: Full speed with max 33 percent duty (delay 0x528).  Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
   }
-  
+
 }
 
 void rx_disable_uart(unsigned chan){
@@ -253,7 +270,7 @@ void toggle_rx_config(void){
   } else if (mode==3) {
     unsigned config = 0x00011001;
     printf("INFO: Full speed, full internal loopback.  Broadcasting rx configs write 0x%08x \r\n", (unsigned int) config);
-    axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);    
+    axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==4) {
     unsigned config;
     config = 0x00011002;
