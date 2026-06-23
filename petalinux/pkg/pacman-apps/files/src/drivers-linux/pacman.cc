@@ -79,11 +79,10 @@ int pacman_init(int verbose){
 
   // DEFAULT parameters
   if (verbose){
-    printf("INFO:  Setting number of cycles per DMA package to 31 (0x1F) as appropriate for DMA buffer length.\n");
+    printf("INFO:  Setting minimum DMA packet size to 0x3900 and packet timeout to 1 ms\n");
     printf("INFO:  Enabling Trigger, Sync, and Heartbeat words in the RX unit.\n");
   }
-  //G_PACMAN_AXIL[0x7FB4>>2] = 0x001F;
-  G_PACMAN_AXIL[0x7FB4>>2] = 0x02000000;
+  G_PACMAN_AXIL[0x7FB4>>2] = 0x026000C4;
   G_PACMAN_AXIL[0x7FB8>>2] = 0x0003;
 
   if (verbose){
