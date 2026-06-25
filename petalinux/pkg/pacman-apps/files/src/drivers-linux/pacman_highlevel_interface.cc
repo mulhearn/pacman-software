@@ -10,6 +10,7 @@
 #include <charconv>
 #include <iomanip>
 
+#include "hw_access.h"
 #include "addr_conf.hh"
 #include "pacman.hh"
 #include "pacman_i2c.hh"
@@ -115,7 +116,7 @@ string handle_set_pacman_id(const pacman_command_t& cmd) {
   if (!get_unsigned(cmd,"id", id))
     return "ERROR: missing or invalid argument for id\r\n";
   PACMAN_ID = 0xFF&id;
-  pacman_write(0x7FBC, PACMAN_ID);
+  axil_write_register(0x7FBC, PACMAN_ID);
   return "pacman id set to " + std::to_string(PACMAN_ID);
 }
 string handle_read_pacman_id(const pacman_command_t&){
@@ -129,34 +130,34 @@ string handle_set_vdda(const pacman_command_t& cmd) {
 }
 string handle_enable_tile_power(const pacman_command_t&){
   unsigned tmp = 0;
-  tmp = pacman_read(0xF010);
+  tmp = axil_read_register(0xF010);
   tmp |= 0x00010000;
-  pacman_write(0xF010, tmp);
+  axil_write_register(0xF010, tmp);
   return "tile power enabled";
 }
 string handle_disable_tile_power(const pacman_command_t&){
   unsigned tmp = 0;
-  tmp = pacman_read(0xF010);
+  tmp = axil_read_register(0xF010);
   tmp &= 0xFFFEFFFF;
-  pacman_write(0xF010, tmp);
+  axil_write_register(0xF010, tmp);
   return "tile power disabled";
 }
 string handle_enable_tile(const pacman_command_t& cmd) {
   unsigned tmp, tile = 1;
   if ((!get_unsigned(cmd,"tile", tile))||(tile==0)||(tile>10))
       return "ERROR: missing or invalid argument for tile\n";
-  tmp = pacman_read(0xF010);
+  tmp = axil_read_register(0xF010);
   tmp |= (0x1<<(tile-1));
-  pacman_write(0xF010, tmp);
+  axil_write_register(0xF010, tmp);
   return "tile " + std::to_string(tile) + " is enabled.\n";
 }
 string handle_disable_tile(const pacman_command_t& cmd) {
   unsigned tmp, tile = 1;
   if ((!get_unsigned(cmd,"tile", tile))||(tile==0)||(tile>10))
       return "ERROR: missing or invalid argument for tile\n";
-  tmp = pacman_read(0xF010);
+  tmp = axil_read_register(0xF010);
   tmp &= ~(0x1<<(tile-1));
-  pacman_write(0xF010, tmp);
+  axil_write_register(0xF010, tmp);
   return "tile " + std::to_string(tile) + " is disabled.\n";
 }
 
@@ -178,17 +179,17 @@ string handle_send_full_reset(const pacman_command_t& cmd) {
     return "ERROR: invalid or missing argument for mask\n";
 
   // update pulse duration for full reset (1023 cycles):
-  pacman_write(0xE118, 0x03FF3FF5);
-  pacman_write(0xE100, 0x00);
+  axil_write_register(0xE118, 0x03FF3FF5);
+  axil_write_register(0xE100, 0x00);
   usleep(10);
 
   // reset pulses triggered by poke C
-  pacman_write(0xE0C0, mask);
+  axil_write_register(0xE0C0, mask);
   usleep(100);
 
   // set pulse duration back to default (internal reset, 8 cycles):
-  pacman_write(0xE118, 0x03FF0085);
-  pacman_write(0xE100, 0x00);
+  axil_write_register(0xE118, 0x03FF0085);
+  axil_write_register(0xE100, 0x00);
   usleep(10);
 
   return "full reset sent to " + to_hex(mask) + "\n";
@@ -199,7 +200,7 @@ string handle_send_internal_reset(const pacman_command_t& cmd) {
   if (!get_unsigned(cmd, "mask", mask))
     return "ERROR: invalid or missing argument for mask\n";
   // reset pulses triggered by poke C
-  pacman_write(0xE0C0, mask);
+  axil_write_register(0xE0C0, mask);
 
   return "internal reset sent to " + to_hex(mask) + "\n";
 }
@@ -210,7 +211,7 @@ string handle_send_sync_timestamp(const pacman_command_t& cmd) {
     return "ERROR: invalid or missing argument for mask\n";
 
   // sync pulses are triggered by poke D
-  pacman_write(0xE0D0, mask);
+  axil_write_register(0xE0D0, mask);
   return "sync timestamp sent to " + to_hex(mask) + "\n";
 }
 

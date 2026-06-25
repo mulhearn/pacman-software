@@ -15,10 +15,6 @@ void pacman_poll_rx(pacman_word_t * buffer, unsigned * index, unsigned max);
 
 int pacman_poll_tx();
 
-int pacman_write(uint32_t addr, uint32_t value);
-
-uint32_t pacman_read(uint32_t addr, int * status = NULL);
-
 unsigned pacman_packet_count_rx(int clear = 0);
 
 unsigned pacman_max_rx_pending(int clear = 0);

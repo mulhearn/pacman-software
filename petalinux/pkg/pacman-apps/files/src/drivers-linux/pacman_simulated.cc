@@ -179,26 +179,4 @@ int pacman_poll_tx(){
   return EXIT_SUCCESS;
 }
 
-uint32_t G_PACMAN_SCRA = 0x0;
-uint32_t G_PACMAN_SCRB = 0x0;
-
-int pacman_write(uint32_t addr, uint32_t value){
-  if (addr == 0x0)
-    G_PACMAN_SCRA = value;
-  else if (addr == 0x4)
-    G_PACMAN_SCRB = value;
-
-  return EXIT_SUCCESS;
-}
-
-uint32_t pacman_read(uint32_t addr, int * status){
-  if (status)
-    *status = EXIT_SUCCESS;
-  if (addr == 0x0)
-    return G_PACMAN_SCRA;
-  else if (addr == 0x4)
-    return G_PACMAN_SCRB;
-  return 0x0;
-}
-
 #endif

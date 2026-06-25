@@ -37,9 +37,6 @@ unsigned pacman_max_rx_pending(int clear){
 
 volatile uint32_t * G_PACMAN_AXIL = NULL;
 
-//PACMAN SERVER Scratch Registers (Accessible at PACMAN_SERVER_VIRTUAL_START + (0, 1)
-uint32_t G_PACMAN_SERVER_SCRA = 0x0;
-uint32_t G_PACMAN_SERVER_SCRB = 0x0;
 
 int pacman_init(int verbose){
   // initialize axi-lite
@@ -47,13 +44,11 @@ int pacman_init(int verbose){
     printf("INFO:  Initializing PACMAN AXI-Lite interface.\n");
   }
 
-  int dh = open("/dev/mem", O_RDWR|O_SYNC);
-  G_PACMAN_AXIL = (uint32_t*)mmap(NULL, PACMAN_AXIL_LEN, PROT_READ|PROT_WRITE, MAP_SHARED, dh, PACMAN_AXIL_ADDR);
+  axil_platform_init();
 
-
-  unsigned fwmajor = G_PACMAN_AXIL[0XFF10>>2];
-  unsigned fwminor = G_PACMAN_AXIL[0XFF14>>2];
-  unsigned fwpatch = G_PACMAN_AXIL[0XFF18>>2];
+  unsigned fwmajor = axil_read_register(0XFF10);
+  unsigned fwminor = axil_read_register(0XFF14);
+  unsigned fwpatch = axil_read_register(0XFF18);
 
   if (verbose){
     printf("INFO:  Running pacman-server version %d.%d.%d\n",
@@ -82,44 +77,42 @@ int pacman_init(int verbose){
     printf("INFO:  Setting minimum DMA packet size to 0x3900 and packet timeout to 1 ms\n");
     printf("INFO:  Enabling Trigger, Sync, and Heartbeat words in the RX unit.\n");
   }
-  G_PACMAN_AXIL[0x7FB4>>2] = 0x026000C4;
-  G_PACMAN_AXIL[0x7FB8>>2] = 0x0003;
+  axil_write_register(0x7FB4, 0x026000C4);
+  axil_write_register(0x7FB8, 0x0003);
 
   if (verbose){
     printf("INFO:  Setting RX clock scale factor to 1 \n");
   }
-  G_PACMAN_AXIL[0x7B04>>2] = 0x00001001;
+  axil_write_register(0x7B04, 0x00001001);
 
   if (verbose){
     printf("INFO:  Limiting TX bandwidth, with clock scale factor 1 \n");
   }
-  // G_PACMAN_AXIL[0x3B04>>2] = 0x05281602;
-  G_PACMAN_AXIL[0x3B04>>2] = 0x07BC1601;
+  // axil_write_register(0x3B04, 0x05281602;
+  axil_write_register(0x3B04, 0x07BC1601);
 
   //polarity configuration: 0xE108
   // 0x0HHHGGGI H=H output mask(10 bits) G=G output mask (10 bits) I = input mask (2 bits)
-  G_PACMAN_AXIL[0xE108>>2] = 0x03FF3FF0;
+  axil_write_register(0xE108, 0x03FF3FF0);
 
   //destination configurations:
   // 0x0MMMDDDO M=tile enables, D=duration O=output enables (1 = G, 2 = H, 4 = T)
   //LEMO A destination configuration:  This is a SYNC pulse, H+T, duration 5
-  G_PACMAN_AXIL[0xE110>>2] = 0x03FF0056;
+  axil_write_register(0xE110, 0x03FF0056);
   //LEMO B destination configuration:  This is a SYNC pulse, H+T, duration 5
-  G_PACMAN_AXIL[0xE114>>2] = 0x03FF0056;
+  axil_write_register(0xE114, 0x03FF0056);
 
   //POKE C destination configuration:  This is an INTERNAL_RESET pulse, G, duration 24
-  G_PACMAN_AXIL[0xE118>>2] = 0x03FF0181;
+  axil_write_register(0xE118, 0x03FF0181);
   //POKE D destination configuration:  This is a FULL_RESET pulse, G, duration 1024
-  G_PACMAN_AXIL[0xE11C>>2] = 0x03FF4001;
+  axil_write_register(0xE11C, 0x03FF4001);
 
   //POKE D destination configuration:  This is a SYNC pulse, H+T, duration 2
-  //G_PACMAN_AXIL[0xE11C>>2] = 0x03FF0056;
+  //axil_write_register(0xE11C, 0x03FF0056);
 
   //Request ATC configuration update:
-  G_PACMAN_AXIL[0xE100>>2] = 0x0;
+  axil_write_register(0xE100, 0x0);
 
-  // duplicate (harmless) effort here while merging new driver code into PACMAN server.
-  axil_platform_init();
 
   return EXIT_SUCCESS;
 }
@@ -213,16 +206,5 @@ int pacman_poll_tx(){
   return EXIT_SUCCESS;
 }
 
-int pacman_write(uint32_t addr, uint32_t value){
-  printf("DEBUG:  writing HW address 0x%x\n", addr);
-  G_PACMAN_AXIL[addr>>2] = value;
-  return EXIT_SUCCESS;
-}
-
-uint32_t pacman_read(uint32_t addr, int * status){
-  if (status)
-    *status = EXIT_SUCCESS;
-  return G_PACMAN_AXIL[addr>>2];
-}
 
 #endif

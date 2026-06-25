@@ -7,7 +7,7 @@
 #include "pacman.hh"
 #include "pacman_i2c.hh"
 
-
+#include "hw_access.h"
 #include "rxtx.h"
 
 
@@ -19,7 +19,8 @@ int pacman_vspace_write(uint32_t addr, uint32_t value){
   if (addr < PACMAN_VSPACE_REG_START){
     // non-virtual address:
     printf("DEBUG: vspace_write: non-virtual reg write at offset 0x%x value 0x%x \r\n", addr, value);
-    return pacman_write(addr, value);
+    axil_write_register(addr, value);
+    return EXIT_SUCCESS;
   }
 
   if (addr >= PACMAN_VSPACE_I2C_START) {
@@ -63,39 +64,39 @@ int pacman_vspace_write(uint32_t addr, uint32_t value){
 
   case 0x0110:
     // DISABLE_GLOBAL_TILE_POWER
-    tmp  = pacman_read(0xF010);
+    tmp  = axil_read_register(0xF010);
     tmp &= ~0x00010000;
-    return pacman_write(0xF010, tmp);
+    axil_write_register(0xF010, tmp);
   case 0x0114:
     // ENABLE_GLOBAL_TILE_POWER
-    tmp = pacman_read(0xF010);
+    tmp = axil_read_register(0xF010);
     tmp |= 0x00010000;
-    return pacman_write(0xF010, tmp);
+    axil_write_register(0xF010, tmp);
 
   case 0x0210:
     // DISABLE_SINGLE_TILE
     if (value >= 10)
       return EXIT_SUCCESS;
-    tmp = pacman_read(0xF010);
+    tmp = axil_read_register(0xF010);
     tmp &= ~(1<<value);
-    return pacman_write(0xF010, tmp);
+    axil_write_register(0xF010, tmp);
   case 0x0214:
     // ENABLE_SINGLE_TILE
     if (value >= 10)
       return EXIT_SUCCESS;
-    tmp = pacman_read(0xF010);
+    tmp = axil_read_register(0xF010);
     tmp |= (1<<value);
-    return pacman_write(0xF010, tmp);
+    axil_write_register(0xF010, tmp);
   case 0x02F0:
     // DISABLE_ALL_TILE
-    tmp = pacman_read(0xF010);
+    tmp = axil_read_register(0xF010);
     tmp &= ~0x3FF;
-    return pacman_write(0xF010, tmp);
+    axil_write_register(0xF010, tmp);
   case 0x02F4:
     // ENABLE_ALL_TILE
-    tmp = pacman_read(0xF010);
+    tmp = axil_read_register(0xF010);
     tmp |= 0x3FF;
-    return pacman_write(0xF010, tmp);
+    axil_write_register(0xF010, tmp);
   case 0x0310:
     // Disable single UART channel
     if (value >= 40)
@@ -123,37 +124,39 @@ int pacman_vspace_write(uint32_t addr, uint32_t value){
   case 0x0410:
     // this is a request to send a internal reset to tiles in mask:
     // poke C is configured for internal reset
-    return pacman_write(0xE0C0, value);
+    axil_write_register(0xE0C0, value);
   case 0x0420:
     // this is a request to send a full reset to tiles in mask:
     // poke D is configured for full reset
-    return pacman_write(0xE0D0, value);
+    axil_write_register(0xE0D0, value);
 
   //Legacy interface:
   case 0x0010: // 0x00XX
-    tmp = pacman_read(0xF010);
+    tmp = axil_read_register(0xF010);
     tmp &= 0xFFFF0000;
     tmp |= (value & 0x03FF);
-    return pacman_write(0xF010, tmp);
+    axil_write_register(0xF010, tmp);
+    return EXIT_SUCCESS;
   case 0x0014:
-    tmp = pacman_read(0xF010);
+    tmp = axil_read_register(0xF010);
     tmp &= 0xFFF0FFFF;
     if (value&0x1)
       tmp |= 0x00010000;
-    return pacman_write(0xF010, tmp);
+    axil_write_register(0xF010, tmp);
+    return EXIT_SUCCESS;
   case 0x1010: // 0x10XX
     // this is a request to send a reset pulse:
     if ((value&0x4)!=0){
       // use Poke C register (mapped to G output) and enable all tiles
-      return pacman_write(0xE0C0, 0x3FF);
+      axil_write_register(0xE0C0, 0x3FF);
     }
     return EXIT_SUCCESS;
   case 0x1014:
     // this is a request to set the pulse length of the reset signal
     // Configure POKE C stimulus for G output, all ten tiles enabled, provided (12-bit) pulse length
     tmp = 0x03FF0001 | ((value & 0xFFF)<<4);
-    return pacman_write(0xE118, tmp);
-
+    axil_write_register(0xE118, tmp);
+    return EXIT_SUCCESS;
   case 0x201C:
     // RX enables for UARTS 1-32
     for (uint32_t i = 0; i < 32; ++i) {
@@ -190,7 +193,7 @@ uint32_t pacman_vspace_read(uint32_t addr, int * status){
   if (addr < PACMAN_VSPACE_REG_START){
     // non-virtual address:
     printf("DEBUG: vspace_read: non-virtual reg read at address 0x%x \r\n", addr);
-    return pacman_read(addr, status);
+    return axil_read_register(addr);
   }
 
   if (addr >= PACMAN_VSPACE_I2C_START) {
