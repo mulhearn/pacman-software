@@ -112,6 +112,28 @@ hw_val_t axil_read_register  (hw_addr_t offset);
 void     axil_write_register (hw_addr_t offset, hw_val_t value);
 
 //
+// AXI-LITE timing register access:
+//
+
+// initialize the AXI-LITE interface for register access:
+void timing_platform_init();
+
+// initialize the AXI-LITE interface for register access:
+void timing_platform_close();
+
+// report the status of the AXI-LITE interface:
+hw_u32_t timing_platform_status();
+
+// clear any errors in the AXI-LITE interface:
+void timing_platform_clear_status();
+
+// read the HW registers with offset <offset> relative to the AXI-LITE base address:
+hw_val_t timing_read_register  (hw_addr_t offset);
+
+// write <value> to the HW registers with offset <offset> relative to the AXI-LITE base address:
+void     timing_write_register (hw_addr_t offset, hw_val_t value);
+
+//
 // DMA Registers:
 //
 

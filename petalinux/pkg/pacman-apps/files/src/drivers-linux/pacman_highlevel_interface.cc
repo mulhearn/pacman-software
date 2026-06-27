@@ -13,7 +13,6 @@
 #include "hw_access.h"
 #include "addr_conf.hh"
 #include "pacman.hh"
-#include "pacman_i2c.hh"
 
 using std::string;
 using std::vector;

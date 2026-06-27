@@ -68,6 +68,54 @@ void     axil_write_register (hw_addr_t offset, hw_val_t value){
 }
 
 //
+// Timing Registers:
+//
+
+// placeholder values until new firmware
+#define TIMING_REGISTERS_BASEADDR AXIL_REGISTERS_BASEADDR
+#define TIMING_REGISTERS_LEN AXIL_REGISTERS_LEN
+
+static volatile uint32_t * G_TIMING  = NULL;
+
+void timing_platform_init(){
+  // do nothing if already initialized:
+  if (G_TIMING != NULL)
+    return;
+
+  timing_platform_clear_status();
+
+  printf("INFO:  Opening /dev/mem.\n");
+  int dh = open("/dev/mem", O_RDWR|O_SYNC);
+  if (dh < 0) {
+    printf("ERROR:  Failed to open /dev/mem\r\n");
+    return;
+  }
+
+  printf("INFO:  Initializing PACMAN AXI-Lite interface of size %d at 0x%X\n", TIMING_REGISTERS_LEN, TIMING_REGISTERS_BASEADDR);
+  G_TIMING = (uint32_t*) mmap(NULL, TIMING_REGISTERS_LEN, PROT_READ|PROT_WRITE, MAP_SHARED, dh, TIMING_REGISTERS_BASEADDR);
+  if (G_TIMING == MAP_FAILED) {
+    printf("ERROR:  mmap failed");
+    close(dh);
+    return;
+  }
+  close(dh);
+}
+
+void timing_platform_close(){ }
+
+hw_u32_t timing_platform_status(){ return HW_SUCCESS; }
+
+void timing_platform_clear_status() {}
+
+hw_val_t timing_read_register  (hw_addr_t offset){
+  return G_TIMING[offset>>2];
+}
+
+void     timing_write_register (hw_addr_t offset, hw_val_t value){
+  G_TIMING[offset>>2] = value;
+}
+
+//
 // DMA Registers (AXI-Lite Interface):
 //
 

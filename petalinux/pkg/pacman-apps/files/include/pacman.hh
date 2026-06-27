@@ -19,5 +19,8 @@ unsigned pacman_packet_count_rx(int clear = 0);
 
 unsigned pacman_max_rx_pending(int clear = 0);
 
+void pacman_write(uint32_t addr, uint32_t value);
+
+uint32_t pacman_read(uint32_t addr);
 
 #endif

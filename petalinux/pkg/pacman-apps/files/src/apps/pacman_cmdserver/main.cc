@@ -5,7 +5,6 @@
 
 #include "tx_buffer.hh"
 #include "pacman.hh"
-#include "pacman_vspace.hh"
 #include "pacman_message.hh"
 #include "pacman_highlevel_interface.hh"
 
@@ -27,7 +26,7 @@ void handle_ping(pacman_word_t * req_word, pacman_word_t * rep_word){
 void handle_read(pacman_word_t * req_word, pacman_word_t * rep_word){
   uint32_t addr = req_word->read.addr;
   printf("INFO:  handling read request for address 0x%08x\n", addr);
-  uint32_t value = pacman_vspace_read(addr);
+  uint32_t value = pacman_read(addr);
   uint8_t pacman_id = get_pacman_id();
   write_word_read(rep_word, pacman_id, addr, value);
 }
@@ -36,7 +35,7 @@ void handle_write(pacman_word_t * req_word, pacman_word_t * rep_word){
   uint32_t addr  = req_word->write.addr;
   uint32_t value = req_word->write.value;
   printf("INFO:  handling write request for address 0x%08x and value 0x%08x\n", addr, value);
-  pacman_vspace_write(addr, value);
+  pacman_write(addr, value);
   uint8_t pacman_id = get_pacman_id();
   write_word_write(rep_word, pacman_id, addr, value);
 }

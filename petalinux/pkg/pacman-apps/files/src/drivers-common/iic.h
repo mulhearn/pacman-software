@@ -53,6 +53,13 @@ hw_u32_t iic_mon_iboard_ma(hw_u32_t chan);
 // Get monitored value of votage drop across probe in raw counts:
 hw_u32_t iic_mon_probe_dn();
 
+// Setup MUX to route chan to front panel: (0=off, 1-10=TILE, 11=DAC)
+void iic_set_mux_front_panel(hw_val_t chan);
+
+// Setup MUX to route chan to ADC: (0=off, 1-10=TILE, 11=DAC)
+void iic_set_mux_adc(hw_val_t chan);
+
+
 #ifdef __cplusplus
 }
 #endif

@@ -7,8 +7,8 @@
 #include <zmq.h>
 #include <cassert>
 
+#include "addr_conf.hh"
 #include "pacman.hh"
-#include "pacman_vspace.hh"
 #include "pacman_highlevel_interface.hh"
 #include "tx_buffer.hh"
 

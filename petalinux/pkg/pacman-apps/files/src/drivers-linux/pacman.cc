@@ -11,12 +11,12 @@
 #include "addr_conf.hh"
 #include "pacman.hh"
 #include "tx_buffer.hh"
-#include "pacman_i2c.hh"
 
 // new common drivers:
 #include "hw_access.h"
 #include "dma.h"
 #include "rxtx.h"
+#include "iic.h"
 
 static unsigned count_rx = 0;
 static unsigned max_rx_pending = 0;
@@ -45,6 +45,7 @@ int pacman_init(int verbose){
   }
 
   axil_platform_init();
+  timing_platform_init();
 
   unsigned fwmajor = axil_read_register(0XFF10);
   unsigned fwminor = axil_read_register(0XFF14);
@@ -56,21 +57,12 @@ int pacman_init(int verbose){
     printf("INFO:  Running pacman firmware version %d.%d.%d\n", fwmajor, fwminor, fwpatch);
   }
 
-  // I2C
+  // initialize I2C
   if (verbose){
-    printf("INFO:  Initializing PACMAN I2C interface.\n");
+    printf("INFO:  Initializing PACMAN I2C interface for PACMAN 1v5\n");
   }
-  if (! (i2c_open()==EXIT_SUCCESS)){
-    printf("ERROR:  Could not open PACMAN I2C interface...\n");
-  }
-  unsigned i2cmajor = i2c_read(0x220);
-  unsigned i2cminor = i2c_read(0x221);
-  unsigned i2cdebug = i2c_read(0x222);
-
-  // I2C
-  if (verbose){
-    printf("INFO:  Running I2C firmware version %d.%d (Debug Code:  0x%x)\n", i2cmajor, i2cminor, i2cdebug);
-  }
+  iic_platform_init();
+  iic_set_hw_version(1,5,0);
 
   // DEFAULT parameters
   if (verbose){
