@@ -26,7 +26,7 @@ if [ -d "$PROJ/project-spec.prev" ]; then
     exit 0
 fi
 
-# BASELINE is the project-spec directory provided by TRENZ for the test board design:
+# Baseline is the project-spec directory provided by TRENZ for the test board design:
 mv $PROJ/project-spec $PROJ/project-spec.prev
 cp -r $SRC/trenz/project-spec $PROJ/
 
