@@ -223,9 +223,7 @@ void toggle_tx_config(void){
 void rx_disable_uart(unsigned chan){
   if (chan < 40){
     hw_u32_t cfg = axil_read_register(SCOPE_RX+(chan<<8)+C_ADDR_RX_UART_CONFIG);
-    // for the particular config value of "11" the AND step could be skipped, but let's not:
-    cfg &= (~0x00030000);
-    cfg |=   0x00030000;
+    cfg &= (~0x00000F00);
     axil_write_register(SCOPE_RX+(chan<<8)+C_ADDR_RX_UART_CONFIG, cfg);
   }
 }
@@ -234,8 +232,8 @@ void rx_enable_uart(unsigned chan){
   if (chan < 40){
     hw_u32_t cfg = axil_read_register(SCOPE_RX+(chan<<8)+C_ADDR_RX_UART_CONFIG);
     // for the particular config value of "00" the OR step could be skipped, but let's not:
-    cfg &= (~0x00030000);
-    cfg |=   0x00000000;
+    cfg &= (~0x00000F00);
+    cfg |=   0x00000100;
     axil_write_register(SCOPE_RX+(chan<<8)+C_ADDR_RX_UART_CONFIG, cfg);
   }
 }
@@ -243,58 +241,61 @@ void rx_enable_uart(unsigned chan){
 bool rx_uart_is_enabled(unsigned chan){
   if (chan < 40){
     hw_u32_t cfg = axil_read_register(SCOPE_RX+(chan<<8)+C_ADDR_RX_UART_CONFIG);
-    if ((cfg&0x00020000) == 0) {
+    if ((cfg&0x00000F00) == 0x100) {
       return true;
     }
   }
   return false;
 }
 
-
-
 void toggle_rx_config(void){
   static int mode = 0;
-  mode = (mode + 1) % 6;
+  mode = (mode + 1) % 5;
   if (mode==0){
-    unsigned config = 0x00001002;
-    printf("INFO: Half speed, no internal loopback.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
+    unsigned config = 0x00000101;
+    printf("INFO:  UART input.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==1) {
-    unsigned config = 0x00011002;
-    printf("INFO: Half speed, full internal loopback.  Broadcasting rx configs write 0x%08x \r\n", config);
+    unsigned config = 0x00000201;
+    printf("INFO: Full internal loopback.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==2) {
-    unsigned config = 0x00001001;
-    printf("INFO: Full speed, no internal loopback.  Broadcasting rx configs write 0x%08x \r\n", (unsigned int) config);
+    unsigned config = 0x00000401;
+    printf("INFO: Test pattern mode.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==3) {
-    unsigned config = 0x00011001;
-    printf("INFO: Full speed, full internal loopback.  Broadcasting rx configs write 0x%08x \r\n", (unsigned int) config);
+    unsigned config = 0x00000104;
+    printf("INFO: UART with input phase adjustment.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==4) {
-    unsigned config;
-    config = 0x00011002;
-    printf("INFO: Half speed, tiles 2-10 use internal loopback.  Broadcasting rx configs t 0x%08x \r\n", (unsigned int) config);
+    unsigned config = 0x00000107;
+    printf("INFO: UART with input phase adjustment.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
-    config = 0x00001002;
-    printf("INFO: Tile 1 does not use internal loopback.  Setting Tile 1 rx config 0x%08x \r\n", (unsigned int) config);
-    axil_write_register(SCOPE_RX+(0<<8)+C_ADDR_RX_UART_CONFIG, config);
-    axil_write_register(SCOPE_RX+(1<<8)+C_ADDR_RX_UART_CONFIG, config);
-    axil_write_register(SCOPE_RX+(2<<8)+C_ADDR_RX_UART_CONFIG, config);
-    axil_write_register(SCOPE_RX+(3<<8)+C_ADDR_RX_UART_CONFIG, config);
-  } else if (mode==5) {
-    unsigned config;
-    config = 0x00011001;
-    printf("INFO: Full speed, tiles 2-10 use internal loopback.  Broadcasting rx configs t 0x%08x \r\n", (unsigned int) config);
-    axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
-    config = 0x00001001;
-    printf("INFO: Tile 1 does not use internal loopback.  Setting Tile 1 rx config 0x%08x \r\n", (unsigned int) config);
-    axil_write_register(SCOPE_RX+(0<<8)+C_ADDR_RX_UART_CONFIG, config);
-    axil_write_register(SCOPE_RX+(1<<8)+C_ADDR_RX_UART_CONFIG, config);
-    axil_write_register(SCOPE_RX+(2<<8)+C_ADDR_RX_UART_CONFIG, config);
-    axil_write_register(SCOPE_RX+(3<<8)+C_ADDR_RX_UART_CONFIG, config);
   }
 }
+
+void toggle_rx_test_patterns(void){
+  static int mode = 0;
+  mode = (mode + 1) % 2;
+  if (mode==0){
+    unsigned config = 0x00000000;
+    unsigned delay  = 0x00000000;
+    printf("INFO:  Test patterns disabled with config: 0x%08x delay 0x%08x\r\n", (unsigned int) config, (unsigned int) delay);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_CONFIG, config);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_DELAY, delay);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_A, 0);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_B, 0);
+  } else if (mode==1) {
+    unsigned config = 0x00000101;
+    unsigned delay  = 0x00000200;
+    printf("INFO:  Test patterns enabled  with config: 0x%08x delay 0x%08x\r\n", (unsigned int) config, (unsigned int) delay);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_CONFIG, config);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_DELAY, delay);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_A, 0xAAAAAAAA);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_B, 0xBBBBBBBB);
+  }
+}
+
 
 void toggle_rx_buffer_config(void){
   static int mode = 0;
@@ -342,6 +343,15 @@ void read_rx_status(void){
   printf("header c--------------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_HEADER_C));
   printf("header d--------------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_HEADER_D));
   printf("end of packet header--------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_EOP_HEADER));
+
+  printf("pattern config--------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_CONFIG));
+  printf("pattern delay---------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_DELAY));
+  printf("payload---------------------0x%x %x    \r\n",
+	 (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_B),
+	 (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_A));
+  printf("pattern status--------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_STATUS));
+  printf("pattern starts--------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_STARTS));
+  printf("pattern stops---------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_STOPS));
 }
 
 void read_rx_look(void){

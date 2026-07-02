@@ -120,6 +120,15 @@ root@Trenz:~# /sbin/devmem 0x4000FF14
 root@Trenz:~# /sbin/devmem 0x4000FF18
 0x00000000
 
+And writing and reading the scratch registers:
+
+root@Trenz:~# devmem 0x4000F020 w 0xAAAABBBB
+root@Trenz:~# devmem 0x4000F024 w 0xCCCCDDDD
+root@Trenz:~# devmem 0x4000F020 w
+0xAAAABBBB
+root@Trenz:~# devmem 0x4000F024 w
+0xCCCCDDDD
+
 #
 # Other Flows (Not Checked Recently...)
 #

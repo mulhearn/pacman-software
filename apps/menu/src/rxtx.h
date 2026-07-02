@@ -55,6 +55,14 @@ extern "C" {
 #define C_ADDR_TX_BUFFER_STATUS 0xB0
 #define C_ADDR_TX_ZERO_CNTS     0xF8
 
+#define C_ADDR_RX_PATTERN_A      0x80
+#define C_ADDR_RX_PATTERN_B      0x84
+#define C_ADDR_RX_PATTERN_DELAY  0x88
+#define C_ADDR_RX_PATTERN_CONFIG 0x8C
+#define C_ADDR_RX_PATTERN_STATUS 0x90
+#define C_ADDR_RX_PATTERN_STARTS 0x94
+#define C_ADDR_RX_PATTERN_STOPS  0x98
+
 // this is reserved in system-user.dtsi and located within the HP AXI interface for DMA (0x00000000 - 0x3FFFFFFF):
 #define DMA_BUFFER_BASEADDR  0x20000000
 #define DMA_BUFFER_SIZE      0x10000000  // 256 MB
@@ -113,6 +121,8 @@ void read_rx_look(void);
 void toggle_rx_config(void);
 void toggle_rx_buffer_config(void);
 void toggle_rx_buffer_enables(void);
+void toggle_rx_test_patterns(void);
+
 void zero_rxtx_counts(void);
 
 void init_rxtx_descriptor_ring_mode(int ring_size);

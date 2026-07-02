@@ -73,9 +73,9 @@ int pacman_init(int verbose){
   axil_write_register(0x7FB8, 0x0003);
 
   if (verbose){
-    printf("INFO:  Setting RX clock scale factor to 1 \n");
+    printf("INFO:  Configuring RX UARTs. \n");
   }
-  axil_write_register(0x7B04, 0x00001001);
+  axil_write_register(0x7B04, 0x00000101);
 
   if (verbose){
     printf("INFO:  Limiting TX bandwidth, with clock scale factor 1 \n");
