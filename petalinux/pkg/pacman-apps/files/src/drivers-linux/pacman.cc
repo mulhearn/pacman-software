@@ -78,10 +78,9 @@ int pacman_init(int verbose){
   axil_write_register(0x7B04, 0x00000101);
 
   if (verbose){
-    printf("INFO:  Limiting TX bandwidth, with clock scale factor 1 \n");
+    printf("INFO:  Limiting TX bandwidth\n");
   }
-  // axil_write_register(0x3B04, 0x05281602;
-  axil_write_register(0x3B04, 0x07BC1601);
+  axil_write_register(0x3B04, 0x07BC0006);
 
   //polarity configuration: 0xE108
   // 0x0HHHGGGI H=H output mask(10 bits) G=G output mask (10 bits) I = input mask (2 bits)
