@@ -200,20 +200,19 @@ void toggle_tx_config(void){
   static int mode = 0;
   mode = (mode + 1) % 4;
   if (mode==0){
-    unsigned config = 0x00000001;
+    unsigned config = 0x00000006;
     printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
   } else if (mode==1) {
-    unsigned config = 0x00000005;
+    unsigned config = 0x00000001;
     printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
   } else if (mode==2) {
     unsigned config = 0x00000002;
     printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
-
   } else if (mode==3) {
-    unsigned config = 0x00000007;
+    unsigned config = 0x00000004;
     printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
   }

@@ -247,6 +247,12 @@ int main(){
     return 0;
   }
 
+  printf("Setting up DMA circular buffers (n=8):\r\n");
+  init_rxtx_descriptor_ring_mode(8);
+
+  printf("Setting ATC default configuration:\r\n");
+  set_atc_default_config();
+
   while(1){
     printf("choose an option:\r\n");
     printf("(1) blink LEDs (2) read global status (3) toggle scratch (4) toggle enables (5) toggle dcache \r\n");

@@ -12,7 +12,7 @@ extern "C" {
 void atc_menu();
 
 // menu options:
-//...
+
 
 #ifdef __cplusplus
 }
