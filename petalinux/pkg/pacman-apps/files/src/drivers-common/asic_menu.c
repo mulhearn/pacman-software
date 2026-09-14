@@ -4,10 +4,12 @@
 #include "global.h"
 #include "iic.h"
 #include "dma.h"
+#include "atc.h"
 #include "rxtx.h"
 #include "asic.h"
 #include "asic_menu.h"
-
+#include "iic_menu.h"
+#include "atc.h"
 
 static int CHIP_ID = 11;
 
@@ -22,29 +24,15 @@ void asic_toggle_chip_id(){
 }
 
 void asic_full_reset(){
-  const hw_u32_t mask = 0x3FF;
   printf("INFO: sending full reset \r\n");
-
-  // update pulse duration for full reset (1023 cycles):
-  axil_write_register(0xE118, 0x03FF3FF5);
-  axil_write_register(0xE100, 0x00);
-  usleep(10);
-
-  // reset pulses triggered by poke C
-  axil_write_register(0xE0C0, mask);
-  usleep(100);
-
-  // set pulse duration back to default (internal reset, 8 cycles):
-  axil_write_register(0xE118, 0x03FF0085);
-  axil_write_register(0xE100, 0x00);
-  usleep(10);
+  const hw_u32_t mask = 0x3FF;
+  axil_write_register(0xE0D0, mask);
 }
 
 void asic_internal_reset(){
   printf("INFO: sending internal reset \r\n");
   const hw_u32_t mask = 0x3FF;
   axil_write_register(0xE0C0, mask);
-
 }
 
 void asic_toggle_version(){
@@ -233,13 +221,14 @@ void asic_read_rx(){
 
     if (((trailer[0]&0xFF) != 0x4C) || (trailer[2] != words)){
       printf("ERROR: invalid trailer detected in DMA packet... skipping.\r\n");
-      printf("DMA packet tailer: 0x%x %x 0x%x %x 0x%x %x\r\n",
+      printf("DMA packet tailer: 0x%08x %08x 0x%08x %08x 0x%08x %08x\r\n",
 	     (unsigned int) trailer[5], (unsigned int) trailer[4], (unsigned int) trailer[3],
 	     (unsigned int) trailer[2], (unsigned int) trailer[1], (unsigned int) trailer[0]);
+      printf("words:  %d\r\n", words);
       dma_add_rx_bd(nxta);
       continue;
     } else if (verbose) {
-      printf("DMA packet tailer: 0x%x %x 0x%x %x 0x%x %x\r\n",
+      printf("DMA packet tailer: 0x%08x %08x 0x%08x %08x 0x%08x %08x\r\n",
 	     (unsigned int) trailer[5], (unsigned int) trailer[4], (unsigned int) trailer[3],
 	     (unsigned int) trailer[2], (unsigned int) trailer[1], (unsigned int) trailer[0]);
     }
@@ -361,17 +350,20 @@ void asic_menu(){
   printf("ASIC menu:  \r\n");
   while(1){
     printf("choose an option:\r\n");
-    printf("(x) Exit ASIC menu\r\n");
-    printf("(v) toggle ASIC version (u) toggle RX UART enables (p) toggle ASIC power\r\n");
+    printf("(x) Exit ASIC menu (d) default ATC config\r\n");
+    printf("(v) toggle ASIC version (u) toggle RX UART enables (p) toggle ASIC power (m) monitor power\r\n");
     printf("(f) send full reset (i) send internal reset (c) config root chip \r\n");
     printf("(a) request all registers (h) hello ASIC (r) read RX \r\n");
-    printf("(l) run ASIC loopback test (d) toggle chip id \r\n");
+    printf("(l) run ASIC loopback test (n) toggle chip id \r\n");
     char input = input_choice();
     printf("INFO: selected %c\r\n", input);
 
     switch(input){
     case 'x':
       return;
+    case 'd':
+      set_atc_default_config();
+      break;
     case 'v':
       asic_toggle_version();
       break;
@@ -380,6 +372,9 @@ void asic_menu(){
       break;
     case 'p':
       asic_toggle_power();
+      break;
+    case 'm':
+      iic_monitor_power();
       break;
     case 'f':
       asic_full_reset();
@@ -396,7 +391,7 @@ void asic_menu(){
     case 'h':
       asic_hello();
       break;
-    case 'd':
+    case 'n':
       asic_toggle_chip_id();
       break;
     case 'r':

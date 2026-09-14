@@ -390,10 +390,10 @@ void atc_menu(){
       toggle_atc_destinations();
       break;
     case 4:
-      send_poke_c();
+      send_poke_c(0x3FF);
       break;
     case 5:
-      send_poke_d();
+      send_poke_d(0x3FF);
       break;
     default:
       printf("invalid selection...\r\n");

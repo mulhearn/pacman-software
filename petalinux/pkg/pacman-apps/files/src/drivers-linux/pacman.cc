@@ -17,6 +17,7 @@
 #include "dma.h"
 #include "rxtx.h"
 #include "iic.h"
+#include "atc.h"
 
 static unsigned count_rx = 0;
 static unsigned max_rx_pending = 0;
@@ -82,27 +83,10 @@ int pacman_init(int verbose){
   }
   axil_write_register(0x3B04, 0x07BC0006);
 
-  //polarity configuration: 0xE108
-  // 0x0HHHGGGI H=H output mask(10 bits) G=G output mask (10 bits) I = input mask (2 bits)
-  axil_write_register(0xE108, 0x03FF3FF0);
-
-  //destination configurations:
-  // 0x0MMMDDDO M=tile enables, D=duration O=output enables (1 = G, 2 = H, 4 = T)
-  //LEMO A destination configuration:  This is a SYNC pulse, H+T, duration 5
-  axil_write_register(0xE110, 0x03FF0056);
-  //LEMO B destination configuration:  This is a SYNC pulse, H+T, duration 5
-  axil_write_register(0xE114, 0x03FF0056);
-
-  //POKE C destination configuration:  This is an INTERNAL_RESET pulse, G, duration 24
-  axil_write_register(0xE118, 0x03FF0181);
-  //POKE D destination configuration:  This is a FULL_RESET pulse, G, duration 1024
-  axil_write_register(0xE11C, 0x03FF4001);
-
-  //POKE D destination configuration:  This is a SYNC pulse, H+T, duration 2
-  //axil_write_register(0xE11C, 0x03FF0056);
-
-  //Request ATC configuration update:
-  axil_write_register(0xE100, 0x0);
+  if (verbose){
+    printf("INFO:  Setting ASIC Timing and Control unit to default configuration. \n");
+  }
+  set_atc_default_config();
 
 
   return EXIT_SUCCESS;
