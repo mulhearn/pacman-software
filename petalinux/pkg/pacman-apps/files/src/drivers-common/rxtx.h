@@ -23,6 +23,10 @@ extern "C" {
 #define C_ADDR_RX_UART_UPDATES      0x28
 #define C_ADDR_RX_UART_LOST         0x2C
 
+#define C_ADDR_RX_UART_FRAME_ERR    0x30
+#define C_ADDR_RX_UART_NOISE        0x34
+
+
 #define C_ADDR_RX_LOOK_SELECT       0xA0
 #define C_ADDR_RX_LOOK_UA           0xA4
 #define C_ADDR_RX_LOOK_UB           0xA8

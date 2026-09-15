@@ -198,22 +198,53 @@ void benchmark_dma_rxtx_loopback();
 
 void toggle_tx_config(void){
   static int mode = 0;
-  mode = (mode + 1) % 4;
+  mode = (mode + 1) % 12;
   if (mode==0){
-    unsigned config = 0x00000001;
+    unsigned config = 0x00C60006;
     printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
-  } else if (mode==1) {
-    unsigned config = 0x00000005;
+  } else if (mode==1){
+    unsigned config = 0x00000006;
     printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
   } else if (mode==2) {
-    unsigned config = 0x00000002;
+    unsigned config = 0x00C60001;
     printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
-
   } else if (mode==3) {
-    unsigned config = 0x00000007;
+    unsigned config = 0x00000001;
+    printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
+  } else if (mode==4) {
+    unsigned config = 0x00C60002;
+    printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
+  } else if (mode==5) {
+    unsigned config = 0x00C60003;
+    printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
+  } else if (mode==6) {
+    unsigned config = 0x00C60004;
+    printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
+  } else if (mode==7) {
+    unsigned config = 0x00C60005;
+    printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
+  } else if (mode==8) {
+    unsigned config = 0x00C60006;
+    printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
+  } else if (mode==9) {
+    unsigned config = 0x00C60007;
+    printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
+  } else if (mode==10) {
+    unsigned config = 0x00C60008;
+    printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
+  } else if (mode==11) {
+    unsigned config = 0x00C60009;
     printf("INFO: Broadcasting tx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_TX+UART_BROADCAST+C_ADDR_TX_UART_CONFIG, config);
   }
@@ -249,26 +280,30 @@ bool rx_uart_is_enabled(unsigned chan){
 
 void toggle_rx_config(void){
   static int mode = 0;
-  mode = (mode + 1) % 5;
+  mode = (mode + 1) % 6;
   if (mode==0){
-    unsigned config = 0x00000101;
+    unsigned config = 0x000A1104;
     printf("INFO:  UART input.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==1) {
-    unsigned config = 0x00000201;
+    unsigned config = 0x000A1204;
     printf("INFO: Full internal loopback.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==2) {
-    unsigned config = 0x00000401;
+    unsigned config = 0x000A1404;
     printf("INFO: Test pattern mode.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==3) {
-    unsigned config = 0x00000104;
-    printf("INFO: UART with input phase adjustment.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
+    unsigned config = 0x000A2201;
+    printf("INFO: Full internal loopback, with edge detect disabled.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   } else if (mode==4) {
-    unsigned config = 0x00000107;
-    printf("INFO: UART with input phase adjustment.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
+    unsigned config = 0x000A5208;
+    printf("INFO: Full internal loopback, with intentional noise.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
+    axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
+  } else if (mode==5) {
+    unsigned config = 0x000A5209;
+    printf("INFO: Full internal loopback, with intentional failures.  Broadcasting rx config write 0x%08x \r\n", (unsigned int) config);
     axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
   }
 }
@@ -324,8 +359,10 @@ void read_rx_status(void){
     unsigned beats   = axil_read_register(SCOPE_RX+cshift+C_ADDR_RX_UART_BEATS);
     unsigned updates = axil_read_register(SCOPE_RX+cshift+C_ADDR_RX_UART_UPDATES);
     unsigned lost    = axil_read_register(SCOPE_RX+cshift+C_ADDR_RX_UART_LOST);
+    unsigned frame   = axil_read_register(SCOPE_RX+cshift+C_ADDR_RX_UART_FRAME_ERR);
+    unsigned noise   = axil_read_register(SCOPE_RX+cshift+C_ADDR_RX_UART_NOISE);
 
-    printf("%2d: ch: %2d cfg: 0x%08x status: 0x%08x s: %d b: %d u: %d l: %d\r\n",i, ichan, config, status, starts, beats, updates, lost);
+    printf("%2d: ch: %2d cfg: 0x%08x status: 0x%08x s: %d b: %d u: %d l: %d f:%d n:%d\r\n",i, ichan, config, status, starts, beats, updates, lost, frame, noise);
   }
   printf("rx buffer status------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_BUFFER_STATUS));
   printf("rx buffer config------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+0x3F00+C_ADDR_RX_BUFFER_CONFIG));

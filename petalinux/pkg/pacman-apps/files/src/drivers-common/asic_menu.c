@@ -15,9 +15,9 @@ static int CHIP_ID = 11;
 
 void asic_toggle_chip_id(){
   static int mode = 0;
-  mode = (mode + 1) % 5;
+  mode = (mode + 1) % 6;
 
-  int chip_id_vals[] = {11,12,13,14,255};
+  int chip_id_vals[] = {11,12,13,14,1,255};
 
   printf("INFO:  setting chip ID to %d\r\n", chip_id_vals[mode]);
   CHIP_ID = chip_id_vals[mode];
@@ -125,6 +125,23 @@ void asic_config_root(){
 
   usleep(10000);
 
+  NUM_WORDS = 2;
+  //piso downstream:
+  asic_config_write(&payload[0], CHIP_ID, 125, 0x1);
+  //piso upstream:
+  asic_config_write(&payload[2], CHIP_ID, 124, 0x3);
+
+  for (unsigned i=0; i< NUM_WORDS; i++){
+    asic_print_packet_summary(&payload[2*i]);
+  }
+
+  printf("INFO sending... \n");
+  asic_batch_tx(payload, NUM_WORDS);
+
+
+
+  return;
+
   NUM_WORDS = 12;
   // set various enables:
   asic_config_write(&payload[0], CHIP_ID, 123, 0xC0);
@@ -198,7 +215,7 @@ void asic_hello(){
 }
 
 void asic_read_rx(){
-  unsigned verbose = 0;
+  unsigned verbose = 1;
   unsigned count = 0;
   hw_addr_t nxta;
   hw_u64_t start = 0;

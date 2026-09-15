@@ -19,6 +19,8 @@ asic_version_t asic_get_version(){
 
 //print a summary of a 64-bit ASIC packet:
 void asic_print_packet_summary(hw_u32_t * word){
+  printf("raw: 0x%08lX %08lX ", word[1], word[0]);
+
   if (G_ASIC_VER == LARPIX_V3) {
     unsigned wt = word[0]&0x3;
     unsigned chip = (word[0]>>2)&0xFF;

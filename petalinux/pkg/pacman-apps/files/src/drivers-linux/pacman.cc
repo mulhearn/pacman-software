@@ -76,12 +76,12 @@ int pacman_init(int verbose){
   if (verbose){
     printf("INFO:  Configuring RX UARTs. \n");
   }
-  axil_write_register(0x7B04, 0x00000101);
+  axil_write_register(0x7B04, 0x000A1104);
 
   if (verbose){
     printf("INFO:  Limiting TX bandwidth\n");
   }
-  axil_write_register(0x3B04, 0x07BC0006);
+  axil_write_register(0x3B04, 0x00C60006);
 
   if (verbose){
     printf("INFO:  Setting ASIC Timing and Control unit to default configuration. \n");
