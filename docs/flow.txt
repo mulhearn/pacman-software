@@ -11,7 +11,10 @@ or, with ssh:
 
 git clone git@github.com:mulhearn/pacman-software.git
 
-cd pacman
+cd pacman-software
+
+# put the hardware export file from pacman-firmware in place (see README.txt):
+cp <path to pacman-firmware>/products/pacman.xsa hardware/
 
 source /tools/Xilinx/Vivado/2023.2/settings64.sh
 
@@ -23,11 +26,13 @@ busybox microcom -s 115200 /dev/ttyUSB1
 xsct apps/hello/install.tcl
 cd hello
 xsct run.tcl
+cd ..
 
 # run bare-metal menu application
 xsct apps/menu/install.tcl
 cd menu
 xsct run.tcl
+cd ..
 
 # USAGE NOTE:
 # With some versions of VIVADO, xsct tool under linux hangs occassionally at:
@@ -60,15 +65,30 @@ ls -alh BOOT.BIN image.ub boot.scr
 # put those files on partition 1 (vfat) of an SD card,
 # untar (as root) the rootfs.tar.gz into partion 2 (linux) of an SD card
 
-# building just one user petalinux package (e.g. hwutil/pacman-server):
-../scripts/build_hwutil.sh
+# building just one user petalinux package (pacman-apps: hwutil, pacman-server, ...):
+../scripts/build_pacman-apps.sh
 # build tar file from the generated RPM file:
 mkdir tmp
 cd tmp/
-rpm2cpio ../hwutil-latest.rpm | cpio -idmv
-tar -czf ../hwutil-latest.tar.gz ./
+rpm2cpio ../pacman-apps-latest.rpm | cpio -idmv
+tar -czf ../pacman-apps-latest.tar.gz ./
 cd ..
 rm -fr tmp
+
+# Booting over TFTP (firmware and Linux from a TFTP server)
+
+# on the TFTP server (any TFTP server; its address comes from DHCP, or set serverip in U-Boot):
+cd petalinux/ramdisk
+cp images/linux/boot.scr.uimg images/linux/system.bit images/linux/image.ub <tftp root>/
+
+# SD card: the production BOOT.BIN (and boot.scr) only, no image.ub.  U-Boot then finds nothing to boot on the
+# card and works down its boot targets to dhcp, which fetches boot.scr.uimg from the server and runs it.
+
+# without an SD card, over JTAG, use boot_tftp.tcl instead of boot.tcl.
+xsct apps/jtag_boot/install.tcl
+cd jtag_boot
+xsct run.tcl
+xsct boot_tftp.tcl
 
 # Booting without an SD card (e.g. for PACMAN 1V4 without SD card support)
 

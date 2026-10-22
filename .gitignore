@@ -5,6 +5,7 @@
 /pacman_fsbl
 /hello
 /menu
+/fwcheck
 /jtag_boot
 /*.old
 /*/.petalinux
