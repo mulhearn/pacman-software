@@ -1,7 +1,6 @@
 #include "iic.h"
 #include <stdio.h>
 
-#include "iic.h"
 
 void check_iic(){}
 
@@ -10,12 +9,15 @@ typedef enum {
     HW_DISABLE = 0,
     HW_1V5,
     HW_1V4,
-    HW_1V3
+    HW_1V3,
+    HW_SIM      // simulated board (iic_sim.c), selected only by iic_set_simulated()
 } iic_hw_t;
 
 // forward declarations from iic_hw1v5.c
 void iic_hw1v5_set_vdda_dn(hw_u32_t itile, hw_u32_t val);
 void iic_hw1v5_set_vddd_dn(hw_u32_t itile, hw_u32_t val);
+void iic_hw1v5_set_vplus_dn(hw_val_t val);
+void iic_hw1v5_set_vminus_dn(hw_val_t val);
 
 hw_u32_t iic_hw1v5_mon_vdda_mv(hw_u32_t itile);
 hw_u32_t iic_hw1v5_mon_vddd_mv(hw_u32_t itile);
@@ -27,6 +29,7 @@ hw_val_t iic_hw1v5_mon_iboard_ma(hw_val_t chan);
 hw_u32_t iic_hw1v5_mon_probe_dn();
 
 void iic_hw1v5_set_mux_front_panel(hw_val_t itile);
+void iic_hw1v5_write_mux_reg(hw_val_t side, hw_val_t reg, hw_val_t value);
 void iic_hw1v5_set_mux_adc(hw_val_t itile);
 
 // forward declarations from iic_hw1v4.c
@@ -39,6 +42,19 @@ hw_val_t iic_hw1v4_mon_vddd_mv(hw_val_t itile);
 hw_val_t iic_hw1v4_mon_iddd_ma(hw_val_t itile);
 
 void iic_hw1v4_set_mux_front_panel(hw_val_t itile);
+
+// forward declarations from iic_sim.c
+void     iic_sim_set_vdda_dn(hw_val_t itile, hw_val_t val);
+void     iic_sim_set_vddd_dn(hw_val_t itile, hw_val_t val);
+hw_val_t iic_sim_mon_vdda_mv(hw_val_t itile);
+hw_val_t iic_sim_mon_vddd_mv(hw_val_t itile);
+hw_val_t iic_sim_mon_idda_ma(hw_val_t itile);
+hw_val_t iic_sim_mon_iddd_ma(hw_val_t itile);
+hw_val_t iic_sim_mon_vboard_mv(hw_val_t chan);
+hw_val_t iic_sim_mon_iboard_ma(hw_val_t chan);
+hw_val_t iic_sim_mon_probe_dn();
+void     iic_sim_set_mux_front_panel(hw_val_t itile);
+void     iic_sim_set_mux_adc(hw_val_t itile);
 
 // selected hardware version for implmentation:
 static iic_hw_t current_hw = HW_1V5;
@@ -63,6 +79,10 @@ void iic_set_hw_version(hw_val_t major, hw_val_t minor, hw_val_t patch){
   }
 }
 
+void iic_set_simulated(){
+  current_hw = HW_SIM;
+}
+
 hw_val_t iic_get_hw_version(){
   return current_hw;
 }
@@ -71,6 +91,7 @@ void iic_set_vdda_dn(hw_u32_t itile, hw_u32_t val) {
   switch (current_hw) {
   case HW_1V5: iic_hw1v5_set_vdda_dn(itile, val); break;
   case HW_1V4: iic_hw1v4_set_vdda_dn(itile, val); break;
+  case HW_SIM: iic_sim_set_vdda_dn(itile, val); break;
   default: break;
   }
 }
@@ -79,6 +100,15 @@ void iic_set_vddd_dn(hw_u32_t itile, hw_u32_t val){
   switch (current_hw) {
   case HW_1V5: iic_hw1v5_set_vddd_dn(itile, val); break;
   case HW_1V4: iic_hw1v4_set_vddd_dn(itile, val); break;
+  case HW_SIM: iic_sim_set_vddd_dn(itile, val); break;
+  default: break;
+  }
+}
+
+void iic_set_test_dac_dn(hw_u32_t vp, hw_u32_t vn){
+  switch (current_hw) {
+  case HW_1V5: iic_hw1v5_set_vplus_dn(vp); iic_hw1v5_set_vminus_dn(vn); break;
+  case HW_SIM: iic_sim_set_vdda_dn(10, vp); iic_sim_set_vddd_dn(10, vn); break;
   default: break;
   }
 }
@@ -87,6 +117,7 @@ hw_u32_t iic_mon_vdda_mv(hw_u32_t itile){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_mon_vdda_mv(itile);
   case HW_1V4: return iic_hw1v4_mon_vdda_mv(itile);
+  case HW_SIM: return iic_sim_mon_vdda_mv(itile);
   default: return 0;
   }
 }
@@ -95,6 +126,7 @@ hw_u32_t iic_mon_vddd_mv(hw_u32_t itile){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_mon_vddd_mv(itile);
   case HW_1V4: return iic_hw1v4_mon_vddd_mv(itile);
+  case HW_SIM: return iic_sim_mon_vddd_mv(itile);
   default: return 0;
   }
 }
@@ -103,6 +135,7 @@ hw_u32_t iic_mon_idda_ma(hw_u32_t itile){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_mon_idda_ma(itile);
   case HW_1V4: return iic_hw1v4_mon_idda_ma(itile);
+  case HW_SIM: return iic_sim_mon_idda_ma(itile);
   default: return 0;
   }
 }
@@ -111,6 +144,7 @@ hw_u32_t iic_mon_iddd_ma(hw_u32_t itile){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_mon_iddd_ma(itile);
   case HW_1V4: return iic_hw1v4_mon_iddd_ma(itile);
+  case HW_SIM: return iic_sim_mon_iddd_ma(itile);
   default: return 0;
   }
 }
@@ -118,6 +152,7 @@ hw_u32_t iic_mon_iddd_ma(hw_u32_t itile){
 hw_val_t iic_mon_vboard_mv(hw_val_t chan){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_mon_vboard_mv(chan);
+  case HW_SIM: return iic_sim_mon_vboard_mv(chan);
   default: return 0;
   }
 }
@@ -125,6 +160,7 @@ hw_val_t iic_mon_vboard_mv(hw_val_t chan){
 hw_val_t iic_mon_iboard_ma(hw_val_t chan){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_mon_iboard_ma(chan);
+  case HW_SIM: return iic_sim_mon_iboard_ma(chan);
   default: return 0;
   }
 }
@@ -132,6 +168,7 @@ hw_val_t iic_mon_iboard_ma(hw_val_t chan){
 hw_val_t iic_mon_probe_dn(){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_mon_probe_dn();
+  case HW_SIM: return iic_sim_mon_probe_dn();
   default: return 0;
   }
 }
@@ -139,7 +176,15 @@ hw_val_t iic_mon_probe_dn(){
 void iic_set_mux_front_panel(hw_val_t itile){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_set_mux_front_panel(itile);
+  case HW_SIM: return iic_sim_set_mux_front_panel(itile);
   case HW_1V4: return iic_hw1v4_set_mux_front_panel(itile);
+  default: return;
+  }
+}
+
+void iic_write_mux_reg(hw_val_t side, hw_val_t reg, hw_val_t value){
+  switch (current_hw) {
+  case HW_1V5: return iic_hw1v5_write_mux_reg(side, reg, value);
   default: return;
   }
 }
@@ -147,6 +192,7 @@ void iic_set_mux_front_panel(hw_val_t itile){
 void iic_set_mux_adc(hw_val_t itile){
   switch (current_hw) {
   case HW_1V5: return iic_hw1v5_set_mux_adc(itile);
+  case HW_SIM: return iic_sim_set_mux_adc(itile);
   default: return;
   }
 }
