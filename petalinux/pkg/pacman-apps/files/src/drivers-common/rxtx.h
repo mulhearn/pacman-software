@@ -48,14 +48,14 @@ extern "C" {
 // RX buffer config fields (C_ADDR_RX_BUFFER_CONFIG = 0xMMMMTTTT; firmware rx_buffer.vhd), 0 = no condition:
 #define RX_BUFFER_MAX_WORDS_SHIFT 16          // [31:16] max 192-bit words per DMA packet
 #define RX_BUFFER_MAX_WORDS_MASK  0xFFFF0000
-#define RX_BUFFER_TIMEOUT_SHIFT   0           // [15:0]  packet timeout, in sweeps of 512 clocks
+#define RX_BUFFER_TIMEOUT_SHIFT   0           // [15:0]  packet timeout, in units of 256 clocks
 #define RX_BUFFER_TIMEOUT_MASK    0x0000FFFF
 
 #define RX_BUFFER_CONFIG(max_words, timeout) \
   ( ((max_words) << RX_BUFFER_MAX_WORDS_SHIFT) | ((timeout) << RX_BUFFER_TIMEOUT_SHIFT) )
 
-// DAQ setting (pacman-server):  0x260 words (0x3900 bytes) per packet, timeout 0xC4 sweeps (~1 ms)
-#define RX_BUFFER_CONFIG_DAQ  RX_BUFFER_CONFIG(0x260, 0xC4)
+// DAQ setting (pacman-server):  0x260 words (0x3900 bytes) per packet, timeout 0x188 units (~1 ms)
+#define RX_BUFFER_CONFIG_DAQ  RX_BUFFER_CONFIG(0x260, 0x188)
 
 // operating default:  UART input, 10 clocks per bit, sampled 4 clocks after the falling edge
 #define RX_CONFIG_DEFAULT     RX_CONFIG(0x0A, 0, RX_MODE_EDGE, RX_INPUT_PIN, 4)
@@ -70,8 +70,8 @@ extern "C" {
 
 
 #define C_ADDR_RX_LOOK_SELECT       0xA0
-#define C_ADDR_RX_LOOK_UA           0xA4
-#define C_ADDR_RX_LOOK_UB           0xA8
+#define C_ADDR_RX_LOOK_LOWER        0xA4
+#define C_ADDR_RX_LOOK_UPPER        0xA8
 
 #define C_ADDR_RX_BUFFER_STATUS     0xB0
 #define C_ADDR_RX_BUFFER_CONFIG     0xB4
@@ -96,13 +96,13 @@ extern "C" {
 #define C_ADDR_TX_UART_BEATS    0x24
 
 #define C_ADDR_TX_LOOK_SELECT   0xA0
-#define C_ADDR_TX_LOOK_UA       0xA4
-#define C_ADDR_TX_LOOK_UB       0xA8
+#define C_ADDR_TX_LOOK_LOWER    0xA4
+#define C_ADDR_TX_LOOK_UPPER    0xA8
 #define C_ADDR_TX_BUFFER_STATUS 0xB0
 #define C_ADDR_TX_ZERO_CNTS     0xF8
 
-#define C_ADDR_RX_PATTERN_A      0x80
-#define C_ADDR_RX_PATTERN_B      0x84
+#define C_ADDR_RX_PATTERN_LOWER  0x80
+#define C_ADDR_RX_PATTERN_UPPER  0x84
 #define C_ADDR_RX_PATTERN_DELAY  0x88
 #define C_ADDR_RX_PATTERN_CONFIG 0x8C
 #define C_ADDR_RX_PATTERN_STATUS 0x90

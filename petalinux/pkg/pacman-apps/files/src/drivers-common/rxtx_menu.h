@@ -36,11 +36,18 @@ typedef struct {
   unsigned rcvd[40];      // words received per UART (stray words included)
   unsigned bad_packets;   // RX DMA packets with an invalid size
   unsigned tx_timeout;    // nonzero if TX stalled
+  unsigned timeout;       // nonzero if a time limit ran out:  1 the drain of stale words, 2 the check itself
+  unsigned elapsed_us;    // time spent in the check (after the drain)
 } rxtx_check_t;
 
-void check_rxtx_loopback(unsigned tx_packets, hw_u32_t seed, uint64_t uart_mask, rxtx_check_t * r);
+void rxtx_loopback_run(unsigned tx_packets, hw_u32_t seed, uint64_t uart_mask, rxtx_check_t * r);
 void print_rxtx_check(const rxtx_check_t * r);
 void menu_check_rxtx_loopback(void);
+
+// Check the UART loopback through the pins (loopback card), one tile in tile_mask at a time:
+// ber_bits random bits per tile (0:  the default length).
+#define RXTX_LOOPBACK_PACKETS 10000   // The default length (ber_bits 0), in packets
+void rxtx_check_loopback(hw_u32_t tile_mask, hw_u32_t ber_bits);
 
 #ifdef __cplusplus
 }

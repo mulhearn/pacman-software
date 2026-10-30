@@ -303,24 +303,25 @@ void toggle_rx_test_patterns(void){
     printf("INFO:  Test patterns disabled with config: 0x%08x delay 0x%08x\r\n", (unsigned int) config, (unsigned int) delay);
     axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_CONFIG, config);
     axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_DELAY, delay);
-    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_A, 0);
-    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_B, 0);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_LOWER, 0);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_UPPER, 0);
   } else if (mode==1) {
     unsigned config = 0x00000101;
     unsigned delay  = 0x00004000;
     printf("INFO:  Test patterns enabled  with config: 0x%08x delay 0x%08x\r\n", (unsigned int) config, (unsigned int) delay);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_CONFIG, config & 0xFF);  // phase first (pattern.vhd start-up)
     axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_CONFIG, config);
     axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_DELAY, delay);
-    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_A, 0xAAAAAAAA);
-    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_B, 0xBBBBBBBB);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_LOWER, 0xAAAAAAAA);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_UPPER, 0xBBBBBBBB);
   } else if (mode==2) {
     unsigned config = 0x00000101;
     unsigned delay  = 0x00004000;
     printf("INFO:  Test patterns enabled  with config: 0x%08x delay 0x%08x\r\n", (unsigned int) config, (unsigned int) delay);
     axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_CONFIG, config);
     axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_DELAY, delay);
-    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_A, 0x01234567);
-    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_B, 0x89ABDCDF);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_LOWER, 0x01234567);
+    axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_UPPER, 0x89ABDCDF);
   }
 }
 
@@ -401,8 +402,8 @@ void read_rx_status(void){
   printf("pattern config--------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_CONFIG));
   printf("pattern delay---------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_DELAY));
   printf("payload---------------------0x%x %x    \r\n",
-	 (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_B),
-	 (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_A));
+	 (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_UPPER),
+	 (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_LOWER));
   printf("pattern status--------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_STATUS));
   printf("pattern starts--------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_STARTS));
   printf("pattern stops---------------0x%x    \r\n", (unsigned int) axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_PATTERN_STOPS));
@@ -412,8 +413,8 @@ void read_rx_look(void){
   hw_u32_t udata[2];
   for (int i=0; i<40; i++){
     axil_write_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_LOOK_SELECT, i);
-    udata[0] = axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_LOOK_UA);
-    udata[1] = axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_LOOK_UB);
+    udata[0] = axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_LOOK_LOWER);
+    udata[1] = axil_read_register(SCOPE_RX+UART_GLOBAL+C_ADDR_RX_LOOK_UPPER);
     printf("Channel %2d Look:  0x%08x %08x ", i, (unsigned int) udata[1], (unsigned int) udata[0]);
     asic_print_packet_summary(udata);
   }
@@ -433,8 +434,8 @@ void read_tx_look(void){
   hw_u32_t udata[2];
   for (int i=0; i<40; i++){
     axil_write_register(SCOPE_TX+UART_GLOBAL+C_ADDR_TX_LOOK_SELECT, i);
-    udata[0] = axil_read_register(SCOPE_TX+UART_GLOBAL+C_ADDR_TX_LOOK_UA);
-    udata[1] = axil_read_register(SCOPE_TX+UART_GLOBAL+C_ADDR_TX_LOOK_UB);
+    udata[0] = axil_read_register(SCOPE_TX+UART_GLOBAL+C_ADDR_TX_LOOK_LOWER);
+    udata[1] = axil_read_register(SCOPE_TX+UART_GLOBAL+C_ADDR_TX_LOOK_UPPER);
     printf("Channel %2d Look:  0x%08x %08x ", i, (unsigned int) udata[1], (unsigned int) udata[0]);
     asic_print_packet_summary(udata);
   }

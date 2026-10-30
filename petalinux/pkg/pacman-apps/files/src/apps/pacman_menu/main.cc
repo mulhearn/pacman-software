@@ -18,10 +18,12 @@
 #include "atc.h"
 #include "adc.h"
 #include "asic.h"
+#include "jumper.h"
 
 #include "asic_menu.h"
 #include "atc_menu.h"
 #include "iic_menu.h"
+#include "adc_menu.h"
 
 // *** LED ***
 
@@ -71,6 +73,7 @@ void adc_menu(){
   while(1){
     printf("ADC MENU:  choose an option:\r\n");
     printf("(0) main menu (1) read ADC registers (2) toggle ADC sleep (3) toggle ADC enable (4) toggle DAC \r\n");
+    printf("(5) check ADC (registers, test DAC) (6) check analog monitors \r\n");
 
     int input;
     if (scanf("%d", &input) != 1){
@@ -93,6 +96,12 @@ void adc_menu(){
       break;
     case 4:
       iic_toggle_test_dac();
+      break;
+    case 5:
+      adc_check();
+      break;
+    case 6:
+      adc_check_ana_mon(0x3FF);
       break;
     default:
       printf("invalid selection...\r\n");
@@ -159,6 +168,7 @@ void rxtx_menu(){
     printf("...\r\n");
     printf("(40) reset TX DMA (41) TX DMA status (42) reset RX DMA (43) RX DMA status (44) long DMA status \r\n");
     printf("(45) benchmark TX (46) benchmark RX/TX loopback (47) check RX/TX loopback (random data) \r\n");
+    printf("(48) check RX/TX loopback through the pins (loopback card) \r\n");
 
     int input;
     if (scanf("%d", &input) != 1){
@@ -263,6 +273,9 @@ void rxtx_menu(){
     case 47:
       menu_check_rxtx_loopback();
       break;
+    case 48:
+      rxtx_check_loopback(0x3FF, 0);
+      break;
     default:
       printf("invalid selection...\r\n");
     }
@@ -276,7 +289,7 @@ void atc_menu(){
     printf("choose an option:\r\n");
     printf("(0) Exit timing menu\r\n");
     printf("(1) read ATC registers (2) read ATC counts (3) toggle ATC destinations \r\n");
-    printf("(4) poke C (5) poke D \r\n");
+    printf("(4) poke C (5) poke D (6) toggle G/H polarity (7) toggle counters \r\n");
 
     int input;
     if (scanf("%d", &input) != 1){
@@ -302,6 +315,12 @@ void atc_menu(){
       break;
     case 5:
       send_poke_d(0x3FF);
+      break;
+    case 6:
+      toggle_atc_polarity();
+      break;
+    case 7:
+      toggle_atc_run();
       break;
     default:
       printf("invalid selection...\r\n");
@@ -332,6 +351,7 @@ void main_menu(){
       break;
     case 2:
       read_global_status();
+      read_jumper_status();
       break;
     case 3:
       toggle_global_scratch();
@@ -371,9 +391,14 @@ int main(){
   axil_platform_init();
   print_global_version();
   iic_platform_init();
+  // I2C for the hardware version the firmware was built for (the I2C menu can override):
+  global_status_t gs;
+  get_global_status(&gs);
+  iic_set_hw_version(gs.hardware_major, gs.hardware_minor, gs.hardware_patch);
   bram_platform_init();
   init_rxtx();
   init_led();
+  init_jumper();
 
   main_menu();
 }

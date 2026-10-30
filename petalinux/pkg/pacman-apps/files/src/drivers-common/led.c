@@ -4,6 +4,13 @@
 #include "hw_access.h"
 #include "led.h"
 #include "global.h"
+#include "check.h"
+#ifdef _LINUX
+  #include <poll.h>
+#else
+  #include "xparameters.h"
+  #include "xuartps_hw.h"
+#endif
 
 // -----------------------------------------------------------
 // LED control
@@ -67,3 +74,49 @@ void blink_pacman_leds() {
   }
 }
 
+// Whether the operator has pressed Enter (the line is consumed), without waiting
+static bool enter_pressed(){
+#ifdef _LINUX
+  struct pollfd p = { 0, POLLIN, 0 };
+  if (poll(&p, 1, 0) <= 0) return false;
+  char line[64];
+  if (fgets(line, sizeof(line), stdin) == NULL) return true;   // end of input
+  return true;
+#else
+  bool got = false;
+  while (XUartPs_IsReceiveData(STDIN_BASEADDRESS)){
+    char c = XUartPs_RecvByte(STDIN_BASEADDRESS);
+    if (c == '\r' || c == '\n') got = true;
+  }
+  return got;
+#endif
+}
+
+// One LED on (0:  Trenz red, 1-4:  PACMAN LED-0 to LED-3), the others off
+static void led_one(int k){
+  gpio_write_pin(LED_TRENZ_RED, k == 0);
+  gpio_write_pin(LED_1, k == 1);
+  gpio_write_pin(LED_2, k == 2);
+  axil_write_register(SCOPE_GLOBAL + C_ADDR_GLOBAL_LEDS, k == 3 ? 0x1 : k == 4 ? 0x2 : 0x0);
+}
+
+void led_check_blink(bool pause){
+  init_led();
+  hw_val_t leds = axil_read_register(SCOPE_GLOBAL + C_ADDR_GLOBAL_LEDS);
+  if (pause){
+    printf("OPERATOR:  watch the Trenz red LED, then PACMAN LED-0 to LED-3, lit in turn.  "
+           "Press Enter when done.\r\n");
+    fflush(stdout);
+    for (int k = 0; !enter_pressed(); k = (k + 1) % 5){
+      led_one(k);
+      usleep(250000);
+    }
+    led_one(-1);
+  } else {
+    blink_red_led();
+    blink_pacman_leds();
+  }
+  axil_write_register(SCOPE_GLOBAL + C_ADDR_GLOBAL_LEDS, leds);
+  check_result("INFO", "led_blink", pause ? "LEDs lit in turn until Enter"
+                                          : "LEDs blinked, 2 s each");
+}

@@ -47,7 +47,3 @@ hw_val_t iic_sim_mon_iboard_ma(hw_val_t chan){
 }
 
 hw_val_t iic_sim_mon_probe_dn(){ return 0x4000; }
-
-// the MUX has no readback:  nothing to model
-void iic_sim_set_mux_front_panel(hw_val_t itile){ (void) itile; }
-void iic_sim_set_mux_adc(hw_val_t itile){ (void) itile; }

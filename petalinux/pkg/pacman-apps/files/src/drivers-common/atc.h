@@ -49,6 +49,8 @@ void toggle_atc_run();
 
 void toggle_atc_destinations();
 
+void toggle_atc_polarity();
+
 void send_poke_a(unsigned mask);
 
 void send_poke_b(unsigned mask);

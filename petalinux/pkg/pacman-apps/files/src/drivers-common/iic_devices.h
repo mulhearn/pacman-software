@@ -1,5 +1,9 @@
-#ifndef IIC_H
-#define IIC_H
+#ifndef IIC_DEVICES_H
+#define IIC_DEVICES_H
+
+// iic_devices.h
+//
+// Device specific I2C drivers.
 
 #include "hw_access.h"
 
@@ -13,17 +17,24 @@ extern "C" {
 // val: digital value to write
 void ad5677_set_voltage(hw_u8_t addr, hw_u8_t chan, hw_val_t val);
 
-// PAC1944 ADC
+// PAC1944 power monitor (4 channel), single shot
 // addr: I2C address of device
-// reg: register to read (see datasheet)
-hw_val_t pac1944_adc_dn(hw_u8_t addr, hw_u8_t reg);
+// chan: 0-3
+hw_val_t pac1944_v_dn(hw_u8_t addr, hw_val_t chan);
+hw_val_t pac1944_i_dn(hw_u8_t addr, hw_val_t chan);
 
-// MAX14661 MUX
-// addr: I2C address of device
-// code[3:0]: setting for COMA/COMB (see datasheet)
-void max14661_set_coma(hw_u8_t addr, hw_val_t code);
+// MAX14661 MUX (16 switches, two commons:  0 = COMA, 1 = COMB;  switch n is bit n-1 of a mask)
+#define MAX14661_CMD_OPEN   0x10  // all switches of the common open
+#define MAX14661_CMD_COPY   0x11  // copy the common's shadow registers
+#define MAX14661_CMD_KEEP   0x12  // no change
+// Command to COMA and COMB, CMD_A then CMD_B (applied once both are written).
+void max14661_cmd(hw_u8_t addr, hw_u8_t cmd_a, hw_u8_t cmd_b);
+// Write the shadow registers of one common.
+void max14661_write_shadow(hw_u8_t addr, hw_val_t common, hw_val_t mask);
+// Read the switch state of one common, as a mask.
+hw_val_t max14661_read(hw_u8_t addr, hw_val_t common);
+// raw register write (development only)
 void max14661_write_reg(hw_u8_t addr, hw_u8_t reg, hw_u8_t value);
-void max14661_set_comb(hw_u8_t addr, hw_val_t code);
 
 // Legacy devices (not present in latest HW version, but still supported in legacy HW)
 

@@ -34,41 +34,67 @@ void iic_set_simulated();
 hw_val_t iic_get_hw_version();
 
 // set VDDA and VDDD of channel <itile> to value <val>
-void iic_set_vdda_dn(hw_u32_t itile, hw_u32_t val);
-void iic_set_vddd_dn(hw_u32_t itile, hw_u32_t val);
+void iic_set_vdda_dn(hw_val_t itile, hw_val_t val);
+void iic_set_vddd_dn(hw_val_t itile, hw_val_t val);
 
 // set the differential test DAC:  <vp> on the positive side, <vn> on the negative side
 // (PACMAN 1V5:  DAC channel 10 of the VDDA and VDDD DACs; also reachable as itile 10 above)
-void iic_set_test_dac_dn(hw_u32_t vp, hw_u32_t vn);
+void iic_set_test_dac_dn(hw_val_t vp, hw_val_t vn);
 
 // Get monitored value of VDDA and VDDD for TILE <chan>+1 in mV
-hw_u32_t iic_mon_vdda_mv(hw_u32_t itile);
-hw_u32_t iic_mon_vddd_mv(hw_u32_t itile);
+hw_val_t iic_mon_vdda_mv(hw_val_t itile);
+hw_val_t iic_mon_vddd_mv(hw_val_t itile);
 
 // Get monitored value of IDDA and IDDD for TILE <chan>+1 in mA
-hw_u32_t iic_mon_idda_ma(hw_u32_t itile);
-hw_u32_t iic_mon_iddd_ma(hw_u32_t itile);
+hw_val_t iic_mon_idda_ma(hw_val_t itile);
+hw_val_t iic_mon_iddd_ma(hw_val_t itile);
 
 // Gen monitored value of board voltage for chan <chan>
 // chan:  0= 3V6, 1=3V3, 2=3V0, 3=3V3 (Probe)
-hw_u32_t iic_mon_vboard_mv(hw_u32_t chan);
+hw_val_t iic_mon_vboard_mv(hw_val_t chan);
 
 // Gen monitored value of board voltage for chan <chan>
 // chan:  0= 3V6, 1=3V3, 2=3V0
-hw_u32_t iic_mon_iboard_ma(hw_u32_t chan);
+hw_val_t iic_mon_iboard_ma(hw_val_t chan);
 
 // Get monitored value of votage drop across probe in raw counts:
-hw_u32_t iic_mon_probe_dn();
+hw_val_t iic_mon_probe_dn();
 
-// Setup MUX to route chan to front panel: (0=off, 1-10=TILE, 11=DAC)
-void iic_set_mux_front_panel(hw_val_t chan);
-// raw register write to one front-panel MUX chip, side 0: P, side 1: N (PACMAN 1V5 MAX14661:
-// 0x10-0x13 shadow switch registers, 0x14 CMDA (COMA), 0x15 CMDB (COMB))
+// Open every switch on both chips.
+void iic_set_mux_open();
+
+// mux sources:
+#define IIC_MUX_OPEN         0   // sources:  nothing
+#define IIC_MUX_TILE_1       1   //           TILE 1 ... TILE 10 = 1 ... 10 (ANA_TEST)
+#define IIC_MUX_TILE_10     10
+#define IIC_MUX_DAC         11   //           the test DAC
+
+// MUX commands below:  return 0 when done;  a request that is not allowed is refused, changes
+// nothing, and returns non-zero.
+
+// front-panel SMA jacks (COMA) mux configuration by  source and 100 ohm termination option
+int iic_set_mux_to_front_panel(hw_val_t source, hw_val_t term);
+
+// onboard ADC (COMB) mux configuration by  source and 100 ohm termination option
+int iic_set_mux_to_adc(hw_val_t source, hw_val_t term);
+
+// For loop testing, source (TILE 1-10 or the DAC) on the front panel, through the 100 ohm loop
+// resistors (R29, R28) into the ADC (PACMAN 1V5 only); opens everything first.  Pattern
+// FRONT_PANEL_R28 requires source IIC_MUX_OPEN.
+#define IIC_MUX_LOOP_SERIES       0   // R29 COMA_P-COMB_N, R28 COMA_N-COMB_P:  ADC sees -(P - N)
+#define IIC_MUX_LOOP_SERIES_SWAP  1   // R28 COMA_P-COMB_N, R29 COMA_N-COMB_P:  ADC sees -(P - N)
+#define IIC_MUX_LOOP_DIVIDER_P    2   // P through R29, R28 to ground:  ADC sees -P/2
+#define IIC_MUX_LOOP_DIVIDER_N    3   // N through R29, R28 to ground:  ADC sees +N/2
+#define IIC_MUX_LOOP_FRONT_PANEL_R28  4   // R28 alone across front panel (J1001 P, J14 N)
+int iic_set_mux_loop(hw_val_t source, hw_val_t pattern);
+
+// commons (board files)
+#define IIC_MUX_FRONT_PANEL  0   // COMA
+#define IIC_MUX_ADC          1   // COMB
+// raw register write to one front-panel MUX chip, side 0: P, side 1: N
+// (PACMAN 1V5 MAX14661: 0x10-0x13 shadow switch registers, 0x14 CMDA (COMA), 0x15 CMDB (COMB)).
+// (unsafe: allows configurations that could damage the hardware)
 void iic_write_mux_reg(hw_val_t side, hw_val_t reg, hw_val_t value);
-
-// Setup MUX to route chan to ADC: (0=off, 1-10=TILE, 11=DAC)
-void iic_set_mux_adc(hw_val_t chan);
-
 
 #ifdef __cplusplus
 }

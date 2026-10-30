@@ -112,6 +112,20 @@ void read_atc_counts(){
 
 }
 
+void toggle_atc_polarity(){
+  static int mode = 0;
+  mode = (mode + 1) % 2;
+  if (mode == 0) {
+    printf("INFO:  setting all G/H outputs to inverting \r\n");
+    axil_write_register(C_SCOPE_ATC + C_ADDR_ATC_CONFIG_G,     0x3FF00);
+    axil_write_register(C_SCOPE_ATC + C_ADDR_ATC_CONFIG_H,     0x3FF00);
+  } else {
+    printf("INFO:  setting all G/H outputs to non-inverting \r\n");
+    axil_write_register(C_SCOPE_ATC + C_ADDR_ATC_CONFIG_G,     0x00000);
+    axil_write_register(C_SCOPE_ATC + C_ADDR_ATC_CONFIG_H,     0x00000);
+  }
+}
+
 void toggle_atc_destinations(){
 
   static int mode = 0;

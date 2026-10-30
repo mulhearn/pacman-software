@@ -586,10 +586,15 @@ void dma_show_bd_ring(hw_addr_t bd_addr) {
 // Buffer Descriptor Utilities:
 //
 
+// The buffer is invalidated here, over its full length:  callers ask for an RX buffer once its BD is complete (so
+// the CPU reads what the DMA wrote, not stale or prefetched lines), and for a TX buffer before writing it (flushed
+// before it is handed to the DMA).  A no-op on Linux.
 hw_ptr_t dma_get_buffer(hw_addr_t bd_addr){
   hw_ptr_t bd = dma_ptr(bd_addr);
   HW_INVALIDATE_DCACHE(bd, DMA_BD_BYTES);
-  return dma_ptr(bd[DMA_BD_BUFFER_ADDRESS]);
+  hw_ptr_t buf = dma_ptr(bd[DMA_BD_BUFFER_ADDRESS]);
+  HW_INVALIDATE_DCACHE(buf, bd[DMA_BD_CONTROL] & DMA_BD_CONTROL_LEN);
+  return buf;
 }
 
 void dma_clear_buffer(hw_addr_t bd_addr) {

@@ -18,3 +18,9 @@ int jumper_installed() {
   // the jumper pulls the pin low against the pull-up (to be confirmed on a 1v5 PACMAN):
   return (value == 0) ? JUMPER_IN : JUMPER_OUT;
 }
+
+void read_jumper_status() {
+  int j5 = jumper_installed();
+  printf("J5 jumper---------------- %s   \r\n",
+         j5 == JUMPER_IN ? "installed" : j5 == JUMPER_OUT ? "not installed" : "unreadable");
+}

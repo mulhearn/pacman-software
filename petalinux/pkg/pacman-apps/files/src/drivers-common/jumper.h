@@ -19,6 +19,9 @@ extern "C" {
 void init_jumper();
 int  jumper_installed();
 
+// print the J5 state (installed, not installed, unreadable) as a status line
+void read_jumper_status();
+
 #ifdef __cplusplus
 }
 #endif

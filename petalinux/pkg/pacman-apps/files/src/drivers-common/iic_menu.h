@@ -18,18 +18,28 @@ typedef struct {
   hw_val_t vddd_mv, iddd_ma;
 } iic_iv_point_t;
 
-void iic_get_iv_curve(hw_u32_t itile, iic_iv_point_t iv[IIC_IV_POINTS]);
+void iic_get_iv_curve(hw_val_t itile, iic_iv_point_t iv[IIC_IV_POINTS]);
 
 // menu interface to ASIC driver:
 void iic_menu();
 
 // menu options:
 void iic_show_status();
+void iic_reset_bus();
 void iic_toggle_hardware_version();
 void iic_toggle_power();
+void iic_monitor_tile_power(int itile);  // itile 0 = tile 1
 void iic_monitor_power();
 void iic_toggle_test_dac();
 void iic_record_iv_curves();
+
+// Check the board rails, and each tile in tile_mask (one at a time) swept over the DAC range into
+// the card's loads, the other tiles checked off.
+void iic_check_power(hw_u32_t tile_mask);
+
+// Put R28 across the SMA jacks J1001 (P) and J14 (N), then open the MUX:  with pause, after the
+// operator presses Enter;  without, at once (the path exercised).
+void iic_check_sma(bool pause);
 
 #ifdef __cplusplus
 }

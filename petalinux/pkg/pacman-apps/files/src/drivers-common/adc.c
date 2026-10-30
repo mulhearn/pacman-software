@@ -14,6 +14,10 @@ void adc_init(){
   gpio_write_pin(ADC_SLEEP_PIN, 1);
 }
 
+void adc_set_sleep(hw_val_t sleep){
+  gpio_write_pin(ADC_SLEEP_PIN, sleep ? 1 : 0);
+}
+
 void adc_read_registers(){
   printf("ADC status--------------- 0x%x \r\n", (unsigned int) axil_read_register(SCOPE_ADC+C_ADDR_ADC_STATUS));
   printf("ADC config--------------- 0x%x \r\n", (unsigned int) axil_read_register(SCOPE_ADC+C_ADDR_ADC_CONFIG));
@@ -44,3 +48,21 @@ void adc_toggle_config(){
   }
 }
 
+
+// *** EMULATOR, MUX, COMPARATOR ***
+
+void adc_set_emulator(hw_u32_t min, hw_u32_t max, int step, hw_u32_t period){
+  axil_write_register(SCOPE_ADC + C_ADDR_ADC_EMUL_MIN, min & 0xFFF);
+  axil_write_register(SCOPE_ADC + C_ADDR_ADC_EMUL_MAX, max & 0xFFF);
+  axil_write_register(SCOPE_ADC + C_ADDR_ADC_EMUL_STEP, (hw_u32_t) step & 0x1FFF);
+  axil_write_register(SCOPE_ADC + C_ADDR_ADC_EMUL_PERIOD, period & 0xFFFF);
+}
+
+void adc_select(hw_u32_t source){
+  axil_write_register(SCOPE_ADC + C_ADDR_ADC_MUX_SELECT, source & 0x1);
+}
+
+void adc_set_comparator(hw_u32_t thresh, hw_u32_t swing){
+  axil_write_register(SCOPE_ADC + C_ADDR_ADC_CMP_THRESH, thresh & 0xFFF);
+  axil_write_register(SCOPE_ADC + C_ADDR_ADC_CMP_SWING, swing & 0xFFF);
+}

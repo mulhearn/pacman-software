@@ -201,11 +201,11 @@ void pacman_write(uint32_t addr, uint32_t value){
     case I2C_VREG_OFFSET_SET_VDDD:
       iic_set_vddd_dn(lower, value);
       return;
-    case I2C_VREG_OFFSET_SET_MUX_FRONT_PANEL:
-      iic_set_mux_front_panel(value);
+    case I2C_VREG_OFFSET_SET_MUX_FRONT_PANEL:   // 0-9 TILE 1-10, 10 DAC, else open
+      iic_set_mux_to_front_panel(value < 10 ? IIC_MUX_TILE_1 + value : value == 10 ? IIC_MUX_DAC : IIC_MUX_OPEN, 0);
       return;
-    case I2C_VREG_OFFSET_SET_MUX_ADC:
-      iic_set_mux_adc(value);
+    case I2C_VREG_OFFSET_SET_MUX_ADC:           // 0-9 TILE 1-10, 10 DAC, else open
+      iic_set_mux_to_adc(value < 10 ? IIC_MUX_TILE_1 + value : value == 10 ? IIC_MUX_DAC : IIC_MUX_OPEN, 0);
       return;
     default:
       break;

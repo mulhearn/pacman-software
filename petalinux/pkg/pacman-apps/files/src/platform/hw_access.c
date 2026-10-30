@@ -7,6 +7,7 @@
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include <errno.h>
 #include <stdbool.h>
 #include "hw_access.h"
 #include "assert.h"
@@ -206,9 +207,27 @@ hw_ptr_t dma_safe_buffer(hw_addr_t addr, hw_addr_t size){
 
 #define I2C_DEV "/dev/i2c-0"
 #define I2C_DEBUG false
+#define I2C_TIMEOUT_10MS 5   // Kernel transfer timeout, in 10 ms units
+
+// Status flags
+#define IIC_STATUS_INIT     0x01
+#define IIC_STATUS_WRITE    0x02
+#define IIC_STATUS_READ     0x04
+#define IIC_STATUS_TIMEOUT  0x08
 
 static int G_IIC_FH = -1;
 static hw_u32_t G_IIC_STATUS = 0;
+static hw_u8_t G_IIC_ADDR = 0;
+static hw_u8_t G_IIC_REG = 0;
+
+// Record a failure.  The first one keeps its device and register.
+static void iic_fail(hw_u32_t flag, hw_u8_t addr, hw_u8_t reg) {
+  if (G_IIC_STATUS == 0) {
+    G_IIC_ADDR = addr;
+    G_IIC_REG = reg;
+  }
+  G_IIC_STATUS |= flag;
+}
 
 void iic_platform_init() {
   // do nothing if already initialized:
@@ -216,41 +235,64 @@ void iic_platform_init() {
     return;
   }
 
-  iic_platform_clear_status();
-
   G_IIC_FH = open(I2C_DEV, O_RDWR);
   if (G_IIC_FH < 0) {
-    printf("**ERROR** Failed to open I2C device");
-    G_IIC_STATUS |= 2;
+    printf("**ERROR** Failed to open I2C device\n");
+    iic_fail(IIC_STATUS_INIT, 0, 0);
     return;
   }
+  ioctl(G_IIC_FH, I2C_TIMEOUT, I2C_TIMEOUT_10MS);
 }
 
 
 void iic_platform_close() {
 }
 
-// report the status of the AXI-LITE interface:
 hw_u32_t iic_platform_status(){
   return G_IIC_STATUS;
 }
 
-// report the status of the AXI-LITE interface:
-void iic_platform_clear_status(){
+// Kind of a failed transfer, a timeout if the kernel timed out
+#define IIC_KIND(kind) (errno == ETIMEDOUT ? IIC_STATUS_TIMEOUT : (kind))
+
+// The kernel driver recovers a stuck bus itself (scl-gpios and sda-gpios in the device tree), so
+// the device is only reopened here.
+void iic_platform_reset(){
   G_IIC_STATUS = 0;
+  G_IIC_ADDR = 0;
+  G_IIC_REG = 0;
+  if (G_IIC_FH >= 0)
+    close(G_IIC_FH);
+  G_IIC_FH = -1;
+  iic_platform_init();
+}
+
+void iic_platform_print_status(){
+  if (G_IIC_STATUS == 0) {
+    printf("I2C status:  OK\n");
+    return;
+  }
+  printf("I2C status:  0x%x (%s%s%s%s) at device 0x%02x register 0x%02x\n", (unsigned) G_IIC_STATUS,
+         (G_IIC_STATUS & IIC_STATUS_INIT)    ? " init"    : "",
+         (G_IIC_STATUS & IIC_STATUS_WRITE)   ? " write"   : "",
+         (G_IIC_STATUS & IIC_STATUS_READ)    ? " read"    : "",
+         (G_IIC_STATUS & IIC_STATUS_TIMEOUT) ? " timeout" : "",
+         G_IIC_ADDR, G_IIC_REG);
 }
 
 // Write a sequence of bytes to an I2C device
 void iic_write(hw_u8_t addr, hw_u8_t reg, const hw_u8_t *data, hw_u32_t len) {
+    if (G_IIC_STATUS)
+        return;
     if (G_IIC_FH < 0) {
         printf("**ERROR** iic_write: I2C not initialized\n");
-        G_IIC_STATUS |= 1;
+        iic_fail(IIC_STATUS_INIT, 0, 0);
         return;
     }
 
     if (ioctl(G_IIC_FH, I2C_SLAVE, addr) < 0) {
         printf("**ERROR** iic_write: Failed to set I2C address 0x%02x\n", addr);
-        G_IIC_STATUS |= 2;
+        iic_fail(IIC_STATUS_WRITE, addr, reg);
         return;
     }
 
@@ -259,10 +301,11 @@ void iic_write(hw_u8_t addr, hw_u8_t reg, const hw_u8_t *data, hw_u32_t len) {
     for (hw_u32_t i = 0; i < len; i++)
         buf[i + 1] = data[i];
 
+    errno = 0;
     ssize_t wrote = write(G_IIC_FH, buf, len + 1);
     if (wrote != (ssize_t)(len + 1)) {
       printf("**ERROR** iic_write: Failed to write %u bytes to 0x%02x (return value:  %zd\n", len+1, addr, wrote);
-      G_IIC_STATUS |= 4;
+      iic_fail(IIC_KIND(IIC_STATUS_WRITE), addr, reg);
     }
 
 #if I2C_DEBUG
@@ -273,43 +316,16 @@ void iic_write(hw_u8_t addr, hw_u8_t reg, const hw_u8_t *data, hw_u32_t len) {
 }
 
 // Read a sequence of bytes from an I2C device
-void iic_read_prev(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len) {
-    if (G_IIC_FH < 0) {
-        printf("**ERROR** iic_read: I2C not initialized\n");
-        G_IIC_STATUS |= 1;
-        return;
-    }
-
-    if (ioctl(G_IIC_FH, I2C_SLAVE, addr) < 0) {
-        printf("**ERROR** iic_read: Failed to set I2C address 0x%02x\n", addr);
-        G_IIC_STATUS |= 2;
-        return;
-    }
-
-    if (write(G_IIC_FH, &reg, 1) != 1) {
-        printf("**ERROR** iic_read: Failed to write register 0x%02x to 0x%02x\n", reg, addr);
-        G_IIC_STATUS |= 4;
-        return;
-    }
-
-    if (read(G_IIC_FH, data, len) != (ssize_t)len) {
-        printf("**ERROR** iic_read: Failed to read %u bytes from 0x%02x\n", len, addr);
-        G_IIC_STATUS |= 8;
-    }
-
-#if I2C_DEBUG
-    printf("iic_read: addr 0x%02x reg 0x%02x data:", addr, reg);
-    for (hw_u32_t i = 0; i < len; i++) printf(" 0x%02x", data[i]);
-    printf("\n");
-#endif
-
-}
-
 void iic_read(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len, bool use_repeated_read)
 {
+    if (G_IIC_STATUS) {
+        memset(data, 0, len);
+        return;
+    }
     if (G_IIC_FH < 0) {
         printf("**ERROR** iic_read: I2C not initialized\n");
-        G_IIC_STATUS |= 1;
+        iic_fail(IIC_STATUS_INIT, 0, 0);
+        memset(data, 0, len);
         return;
     }
 
@@ -317,17 +333,22 @@ void iic_read(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len, bool use_r
         // fallback: simple write() + read()
         if (ioctl(G_IIC_FH, I2C_SLAVE, addr) < 0) {
             printf("**ERROR** iic_read: Failed to set I2C address 0x%02x\n", addr);
-            G_IIC_STATUS |= 2;
+            iic_fail(IIC_STATUS_READ, addr, reg);
+            memset(data, 0, len);
             return;
         }
+        errno = 0;
         if (write(G_IIC_FH, &reg, 1) != 1) {
             printf("**ERROR** iic_read: Failed to write register 0x%02x to 0x%02x\n", reg, addr);
-            G_IIC_STATUS |= 4;
+            iic_fail(IIC_KIND(IIC_STATUS_READ), addr, reg);
+            memset(data, 0, len);
             return;
         }
+        errno = 0;
         if (read(G_IIC_FH, data, len) != (ssize_t)len) {
             printf("**ERROR** iic_read: Failed to read %u bytes from 0x%02x\n", len, addr);
-            G_IIC_STATUS |= 8;
+            iic_fail(IIC_KIND(IIC_STATUS_READ), addr, reg);
+            memset(data, 0, len);
         }
         return;
     }
@@ -349,9 +370,11 @@ void iic_read(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len, bool use_r
     msgset.msgs  = msgs;
     msgset.nmsgs = 2;
 
+    errno = 0;
     if (ioctl(G_IIC_FH, I2C_RDWR, &msgset) < 0) {
         printf("**ERROR** iic_read: repeated read failed from 0x%02x reg 0x%02x\n", addr, reg);
-        G_IIC_STATUS |= 8;
+        iic_fail(IIC_KIND(IIC_STATUS_READ), addr, reg);
+        memset(data, 0, len);
     }
 
 #if I2C_DEBUG

@@ -178,11 +178,17 @@ void iic_platform_init();
 // close the I2C interface:
 void iic_platform_close();
 
-// report the status of the AXI-LITE interface:
+// Report the I2C platform layer status.  The status is sticky and set at the first failed read or
+// write (with its device and register) or init.  While it is non-zero, iic_write and iic_read do
+// nothing (read zero) until it is reset.
 hw_u32_t iic_platform_status();
 
-// report the status of the AXI-LITE interface:
-void iic_platform_clear_status();
+// Reset the I2C platform layer:  recover the bus (controller reset, SCL clocked free) and clear
+// the status.
+void iic_platform_reset();
+
+// Print the I2C platform layer status.
+void iic_platform_print_status();
 
 // Write a sequence of bytes to an I2C device.
 // addr: 7-bit device address
@@ -196,7 +202,8 @@ void iic_write(hw_u8_t addr, hw_u8_t reg, const hw_u8_t *data, hw_u32_t len);
 // reg: register within device
 // data: pointer to hw_u8 array to receive bytes
 // len: number of bytes to read
-// use_repeated_read: true to use repeated read (default behavior)
+// use_repeated_read:  true:  register write, repeated start, read;
+//                     false:  register write, stop, read
 void iic_read(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len, bool use_repeated_read);
 
 //
