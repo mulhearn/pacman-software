@@ -303,12 +303,55 @@ void iic_check_sma(bool pause){
                                           : "R28 set and MUX open (no pause)");
 }
 
+// One stress sweep on the selected hardware (iic.c)
+int iic_stress_sweep(hw_u32_t k, bool dacs, bool ads1219, hw_u8_t * bad, hw_u32_t * n);
+
+void iic_check_stress(hw_u32_t sweeps, bool skip_ads1219){
+  global_status_t gs;
+  get_global_status(&gs);
+  bool dacs = !(gs.enables & (GLOBAL_ENABLE_TILES | GLOBAL_ENABLE_TILE_POWER));
+  if (!dacs)
+    check_result("INFO", "i2c_stress_dacs", "tile enables on (0x%08x):  DACs left out",
+                 (unsigned) gs.enables);
+  if (iic_platform_status()){
+    check_result("FAIL", "i2c_stress", "I2C status already set (0x%x)",
+                 (unsigned) iic_platform_status());
+    iic_platform_print_status();
+    return;
+  }
+  hw_u32_t k, n = 0;
+  hw_u8_t bad = 0;
+  int r = 0;
+  start_hw_timer();
+  for (k = 0; k < sweeps; k++){
+    r = iic_stress_sweep(k, dacs, !skip_ads1219, &bad, &n);
+    if (r || iic_platform_status()) break;
+  }
+  stop_hw_timer();
+  double s = hw_timer_elapsed_us() / 1e6;
+  if (r < 0)
+    check_result("SKIP", "i2c_stress", "no stress sweep for this hardware version");
+  else if (iic_platform_status()){
+    check_result("FAIL", "i2c_stress", "I2C error in sweep %u of %u (status 0x%x)",
+                 (unsigned) k + 1, (unsigned) sweeps, (unsigned) iic_platform_status());
+    iic_platform_print_status();
+  } else if (r)
+    check_result("FAIL", "i2c_stress", "read-back mismatch in sweep %u of %u at device 0x%02x",
+                 (unsigned) k + 1, (unsigned) sweeps, bad);
+  else
+    check_result("PASS", "i2c_stress", "%u sweeps, %u transactions in %.2f s (%.0f per s, clock %u "
+                 "kHz)%s%s",
+                 (unsigned) sweeps, (unsigned) n, s, s > 0 ? n / s : 0.0,
+                 (unsigned) iic_platform_clock_hz() / 1000, dacs ? "" : ", no DACs",
+                 skip_ads1219 ? ", no ADS1219s" : "");
+}
+
 void iic_menu(){
   printf("I2C menu:  \r\n");
   while(1){
     printf("choose an option:\r\n");
     printf("(x) Exit I2C menu (s) I2C status (r) reset I2C (v) toggle I2C HW version (c) check I2C (p) toggle power (m) monitor power \r\n");
-    printf("(k) check power (a) check SMA \r\n");
+    printf("(k) check power (a) check SMA (z) stress I2C \r\n");
     char input = input_choice();
     printf("INFO: selected %c\r\n", input);
 
@@ -326,6 +369,9 @@ void iic_menu(){
       break;
     case 'a':
       iic_check_sma(true);
+      break;
+    case 'z':
+      iic_check_stress(IIC_STRESS_SWEEPS, false);
       break;
     case 'v':
       iic_toggle_hardware_version();

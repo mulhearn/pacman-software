@@ -177,11 +177,15 @@ static void usage(){
   printf("                 through the series loops (no card)\n");
   printf("  --blink        LED blink (pauses)\n");
   printf("  --sma          R28 across the SMA jacks J1001 (P), J14 (N) (pauses), then open\n");
+  printf("  --i2c_stress   sweeps of safe transactions over every I2C device, stopping at the\n");
+  printf("                 first error;  reports the I2C clock rate\n");
   printf("modifiers:\n");
   printf("  --tile_mask M  tiles to check (bit t = tile t+1;  default 0x3ff);  others SKIP\n");
   printf("  --ber_bits N   loopback length in bits per tile (default %d packets)\n",
          RXTX_LOOPBACK_PACKETS);
   printf("  --no_i2c       skip everything on I2C\n");
+  printf("  --sweeps N     --i2c_stress sweeps (default %d)\n", IIC_STRESS_SWEEPS);
+  printf("  --skip_ads1219 --i2c_stress without the 1v4's ADS1219s (control run)\n");
   printf("  --no_pause     no pauses:  --blink blinks a fixed time;  --sma sets the MUX, then\n");
   printf("                 opens it\n");
   printf("  --help         this message\n");
@@ -194,8 +198,8 @@ static void usage(){
 
 // The tests, in run order;  run with the modifiers
 typedef struct {
-  hw_u32_t tile_mask, ber_bits;
-  bool no_iic, pause;
+  hw_u32_t tile_mask, ber_bits, sweeps;
+  bool no_iic, pause, skip_ads1219;
 } hwcheck_opts_t;
 
 static void run_read_only(const hwcheck_opts_t * o)   { read_only(o->no_iic); }
@@ -209,6 +213,9 @@ static void run_ana_mon(const hwcheck_opts_t * o)     { adc_check_ana_mon(o->til
 static void run_adc(const hwcheck_opts_t * o)         { (void) o;  adc_check(); }
 static void run_blink(const hwcheck_opts_t * o)       { led_check_blink(o->pause); }
 static void run_sma(const hwcheck_opts_t * o)         { iic_check_sma(o->pause); }
+static void run_i2c_stress(const hwcheck_opts_t * o)  {
+  iic_check_stress(o->sweeps, o->skip_ads1219);
+}
 
 static const struct {
   const char * option;
@@ -224,28 +231,33 @@ static const struct {
   {"adc",         true,  run_adc},
   {"blink",       false, run_blink},
   {"sma",         true,  run_sma},
+  {"i2c_stress",  true,  run_i2c_stress},
 };
 #define NTESTS (int) (sizeof(TESTS) / sizeof(TESTS[0]))
 
 int main(int argc, char * argv[]){
   // OPT_TEST + test index for the tests
-  enum { OPT_TILE_MASK = 1, OPT_BER_BITS, OPT_NO_I2C, OPT_NO_PAUSE, OPT_HELP, OPT_TEST };
-  static struct option opts[NTESTS + 6];
+  enum { OPT_TILE_MASK = 1, OPT_BER_BITS, OPT_NO_I2C, OPT_NO_PAUSE, OPT_SWEEPS, OPT_SKIP_ADS1219,
+         OPT_HELP, OPT_TEST };
+  static struct option opts[NTESTS + 8];   // the tests, the 7 modifiers, the end
   static const struct option MODIFIERS[] = {
     {"tile_mask", required_argument, 0, OPT_TILE_MASK},
     {"ber_bits",  required_argument, 0, OPT_BER_BITS},
     {"no_i2c",    no_argument,       0, OPT_NO_I2C},
     {"no_pause",  no_argument,       0, OPT_NO_PAUSE},
+    {"sweeps",    required_argument, 0, OPT_SWEEPS},
+    {"skip_ads1219", no_argument,    0, OPT_SKIP_ADS1219},
     {"help",      no_argument,       0, OPT_HELP},
   };
   for (int i = 0; i < NTESTS; i++)
     opts[i] = (struct option) {TESTS[i].option, no_argument, 0, OPT_TEST + i};
-  for (int i = 0; i < 5; i++)
+  const int NMOD = sizeof(MODIFIERS) / sizeof(MODIFIERS[0]);
+  for (int i = 0; i < NMOD; i++)
     opts[NTESTS + i] = MODIFIERS[i];
-  opts[NTESTS + 5] = (struct option) {0, 0, 0, 0};
+  opts[NTESTS + NMOD] = (struct option) {0, 0, 0, 0};
 
   bool selected[NTESTS] = {false};
-  hwcheck_opts_t o = {0x3FF, 0, false, true};
+  hwcheck_opts_t o = {0x3FF, 0, IIC_STRESS_SWEEPS, false, true, false};
   bool bad = false;
   int c;
   while ((c = getopt_long(argc, argv, "", opts, NULL)) != -1){
@@ -258,6 +270,11 @@ int main(int argc, char * argv[]){
       break;
     case OPT_NO_I2C:    o.no_iic = true;   break;
     case OPT_NO_PAUSE:  o.pause = false;   break;
+    case OPT_SWEEPS:
+      o.sweeps = strtoul(optarg, NULL, 0);
+      if (o.sweeps == 0) bad = true;
+      break;
+    case OPT_SKIP_ADS1219: o.skip_ads1219 = true;  break;
     case OPT_HELP:      usage();  return EXIT_PASS;
     default:            usage();  return EXIT_USAGE;
     }

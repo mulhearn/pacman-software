@@ -179,8 +179,8 @@ void iic_platform_init();
 void iic_platform_close();
 
 // Report the I2C platform layer status.  The status is sticky and set at the first failed read or
-// write (with its device and register) or init.  While it is non-zero, iic_write and iic_read do
-// nothing (read zero) until it is reset.
+// write (with its device and register) or init.  While it is non-zero, iic_write, iic_read and
+// iic_write_read do nothing (read zero) until it is reset.
 hw_u32_t iic_platform_status();
 
 // Reset the I2C platform layer:  recover the bus (controller reset, SCL clocked free) and clear
@@ -189,6 +189,9 @@ void iic_platform_reset();
 
 // Print the I2C platform layer status.
 void iic_platform_print_status();
+
+// The I2C clock rate in Hz (as configured).
+hw_u32_t iic_platform_clock_hz();
 
 // Write a sequence of bytes to an I2C device.
 // addr: 7-bit device address
@@ -205,6 +208,16 @@ void iic_write(hw_u8_t addr, hw_u8_t reg, const hw_u8_t *data, hw_u32_t len);
 // use_repeated_read:  true:  register write, repeated start, read;
 //                     false:  register write, stop, read
 void iic_read(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len, bool use_repeated_read);
+
+// Write a sequence of bytes, then read a sequence of bytes, from an I2C device
+// (for commands longer than one byte, e.g. the AD5677 readback).
+// addr:  7-bit device address
+// wdata, wlen:  bytes to write (wlen at least 1)
+// rdata, rlen:  bytes to read
+// use_repeated_read:  true:  write, repeated start, read;
+//                     false:  write, stop, read
+void iic_write_read(hw_u8_t addr, const hw_u8_t *wdata, hw_u32_t wlen, hw_u8_t *rdata,
+                    hw_u32_t rlen, bool use_repeated_read);
 
 //
 // PS GPIO (MIO) Interface:

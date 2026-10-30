@@ -292,6 +292,57 @@ void iic_read(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len,  bool use_
   iic_wait_bus(addr, reg);
 }
 
+// Write wdata, then read rdata (see iic_read)
+void iic_write_read(hw_u8_t addr, const hw_u8_t *wdata, hw_u32_t wlen, hw_u8_t *rdata,
+                    hw_u32_t rlen, bool use_repeated_read) {
+  for (hw_u32_t i = 0; i < rlen; i++)
+    rdata[i] = 0;
+
+  if (G_IIC_STATUS)
+    return;
+  if (!iicps_initialized) {
+    iic_fail(IIC_STATUS_INIT, 0, 0);
+    return;
+  }
+
+  hw_u8_t reg = wlen ? wdata[0] : 0;
+  hw_u8_t wbuf[wlen];
+  for (hw_u32_t i = 0; i < wlen; i++)
+    wbuf[i] = wdata[i];
+
+  if (use_repeated_read)
+    XIicPs_SetOptions(&iicps, XIICPS_REP_START_OPTION);
+  int status = XIicPs_MasterSendPolled(&iicps, wbuf, wlen, addr);
+  if (use_repeated_read)
+    XIicPs_ClearOptions(&iicps, XIICPS_REP_START_OPTION);
+
+  if (status != XST_SUCCESS) {
+    printf("I2C write-read: failed to send 0x%x\r\n", reg);
+    iic_fail(IIC_STATUS_READ, addr, reg);
+    iic_wait_bus(addr, reg);
+    return;
+  }
+
+  if (!use_repeated_read) {
+    if (iic_wait_bus(addr, reg))
+      return;
+  }
+
+  status = XIicPs_MasterRecvPolled(&iicps, rdata, rlen, addr);
+  if (status != XST_SUCCESS) {
+    printf("I2C write-read failed from addr 0x%x reg 0x%x\r\n", addr, reg);
+    iic_fail(IIC_STATUS_READ, addr, reg);
+    for (hw_u32_t i = 0; i < rlen; i++)
+      rdata[i] = 0;
+  }
+
+  iic_wait_bus(addr, reg);
+}
+
+hw_u32_t iic_platform_clock_hz() {
+  return IIC_SCLK_RATE;
+}
+
 //
 // PS GPIO (MIO) Interface:
 //

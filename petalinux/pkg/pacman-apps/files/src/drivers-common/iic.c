@@ -32,6 +32,7 @@ void iic_hw1v5_write_mux_reg(hw_val_t side, hw_val_t reg, hw_val_t value);
 void iic_hw1v5_mux_open();
 int  iic_hw1v5_mux_select(hw_val_t common, hw_val_t source, hw_val_t term);
 int  iic_hw1v5_mux_loop(hw_val_t source, hw_val_t pattern);
+int  iic_hw1v5_stress_sweep(hw_u32_t k, bool dacs, hw_u8_t * bad, hw_u32_t * n);
 
 // forward declarations from iic_hw1v4.c
 void iic_hw1v4_set_vdda_dn(hw_val_t itile, hw_val_t val);
@@ -44,6 +45,8 @@ hw_val_t iic_hw1v4_mon_iddd_ma(hw_val_t itile);
 
 void iic_hw1v4_mux_open();
 int  iic_hw1v4_mux_select(hw_val_t common, hw_val_t source, hw_val_t term);
+
+int  iic_hw1v4_stress_sweep(hw_u32_t k, bool dacs, bool ads1219, hw_u8_t * bad, hw_u32_t * n);
 
 // forward declarations from iic_sim.c
 void     iic_sim_set_vdda_dn(hw_val_t itile, hw_val_t val);
@@ -215,6 +218,16 @@ int iic_set_mux_to_adc(hw_val_t source, hw_val_t term){
     printf("**ERROR** iic_set_mux_to_adc:  no ADC on the MUX of PACMAN 1V4\n");
     return -1;
   case HW_SIM: return 0;
+  default: return -1;
+  }
+}
+
+// One stress sweep on the selected hardware (iic_check_stress, which declares it):  as the board
+// files;  -1 for hardware without one
+int iic_stress_sweep(hw_u32_t k, bool dacs, bool ads1219, hw_u8_t * bad, hw_u32_t * n){
+  switch (current_hw) {
+  case HW_1V5: return iic_hw1v5_stress_sweep(k, dacs, bad, n);
+  case HW_1V4: return iic_hw1v4_stress_sweep(k, dacs, ads1219, bad, n);
   default: return -1;
   }
 }

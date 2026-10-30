@@ -4,6 +4,7 @@
 //
 
 #include <assert.h>
+#include <stdbool.h>
 #include "hw_access.h"
 #include "iic_devices.h"
 #include "iic.h"
@@ -130,3 +131,44 @@ int iic_hw1v4_mux_select(hw_val_t common, hw_val_t source, hw_val_t term){
   max14661_cmd(ADDR_MUX, MAX14661_CMD_COPY, MAX14661_CMD_COPY);
   return 0;
 }
+
+// *** Stress sweep (iic_check_stress) ***
+
+// Sweep k:  the DAC (only with dacs:  one channel written, read back, set to 0), the MUX shadow
+// registers (written, read back, left at 0), the INA220s' and (with ads1219) the ADS1219s'
+// configuration (against sweep 0).  0 if every read matched, else 1 with the device in *bad;  *n
+// counts the transactions.
+int iic_hw1v4_stress_sweep(hw_u32_t k, bool dacs, bool ads1219, hw_u8_t * bad, hw_u32_t * n){
+  static hw_val_t ina_cfg[MAX_TILE];
+  static hw_u8_t ads_cfg[MAX_TILE/2];
+  hw_val_t v = (0xA5C3 + 0x9E37 * k) & 0xFFFF;
+  if (dacs){
+    hw_u8_t chan = k % 16;
+    ad5677_set_voltage(ADDR_DAC, chan, v);
+    hw_val_t got = ad5677_read(ADDR_DAC, chan);
+    ad5677_set_voltage(ADDR_DAC, chan, 0);
+    *n += 3;
+    if (got != v) { *bad = ADDR_DAC;  return 1; }
+  }
+  for (hw_val_t common = 0; common < 2; common++){
+    max14661_write_shadow(ADDR_MUX, common, v);
+    hw_val_t got = max14661_read_shadow(ADDR_MUX, common);
+    max14661_write_shadow(ADDR_MUX, common, 0);
+    *n += 6;
+    if (got != v) { *bad = ADDR_MUX;  return 1; }
+  }
+  for (int i = 0; i < MAX_TILE; i++){
+    hw_val_t cfg = ina220_config(ADDR_ADC_VDDA + i);
+    *n += 1;
+    if (k == 0) ina_cfg[i] = cfg;
+    else if (cfg != ina_cfg[i]) { *bad = ADDR_ADC_VDDA + i;  return 1; }
+  }
+  for (int i = 0; ads1219 && i < MAX_TILE/2; i++){
+    hw_u8_t cfg = ads1219_config(ADDR_ADC_VDDD + i);
+    *n += 1;
+    if (k == 0) ads_cfg[i] = cfg;
+    else if (cfg != ads_cfg[i]) { *bad = ADDR_ADC_VDDD + i;  return 1; }
+  }
+  return 0;
+}
+

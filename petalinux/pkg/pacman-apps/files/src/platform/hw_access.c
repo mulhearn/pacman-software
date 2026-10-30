@@ -386,6 +386,80 @@ void iic_read(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len, bool use_r
 
 
 
+// Write wdata, then read rdata (see iic_read)
+void iic_write_read(hw_u8_t addr, const hw_u8_t *wdata, hw_u32_t wlen, hw_u8_t *rdata,
+                    hw_u32_t rlen, bool use_repeated_read)
+{
+    hw_u8_t reg = wlen ? wdata[0] : 0;
+    if (G_IIC_STATUS) {
+        memset(rdata, 0, rlen);
+        return;
+    }
+    if (G_IIC_FH < 0) {
+        printf("**ERROR** iic_write_read: I2C not initialized\n");
+        iic_fail(IIC_STATUS_INIT, 0, 0);
+        memset(rdata, 0, rlen);
+        return;
+    }
+
+    hw_u8_t wbuf[wlen];
+    memcpy(wbuf, wdata, wlen);
+    if (use_repeated_read) {
+        struct i2c_rdwr_ioctl_data msgset;
+        struct i2c_msg msgs[2] = {
+            { addr, 0,        (__u16) wlen, wbuf },
+            { addr, I2C_M_RD, (__u16) rlen, rdata },
+        };
+        msgset.msgs  = msgs;
+        msgset.nmsgs = 2;
+        errno = 0;
+        if (ioctl(G_IIC_FH, I2C_RDWR, &msgset) < 0) {
+            printf("**ERROR** iic_write_read: repeated read failed from 0x%02x reg 0x%02x\n", addr,
+                   reg);
+            iic_fail(IIC_KIND(IIC_STATUS_READ), addr, reg);
+            memset(rdata, 0, rlen);
+        }
+        return;
+    }
+
+    if (ioctl(G_IIC_FH, I2C_SLAVE, addr) < 0) {
+        printf("**ERROR** iic_write_read: Failed to set I2C address 0x%02x\n", addr);
+        iic_fail(IIC_STATUS_READ, addr, reg);
+        memset(rdata, 0, rlen);
+        return;
+    }
+    errno = 0;
+    if (write(G_IIC_FH, wbuf, wlen) != (ssize_t) wlen) {
+        printf("**ERROR** iic_write_read: Failed to write %u bytes to 0x%02x\n", wlen, addr);
+        iic_fail(IIC_KIND(IIC_STATUS_READ), addr, reg);
+        memset(rdata, 0, rlen);
+        return;
+    }
+    errno = 0;
+    if (read(G_IIC_FH, rdata, rlen) != (ssize_t) rlen) {
+        printf("**ERROR** iic_write_read: Failed to read %u bytes from 0x%02x\n", rlen, addr);
+        iic_fail(IIC_KIND(IIC_STATUS_READ), addr, reg);
+        memset(rdata, 0, rlen);
+    }
+}
+
+// The device tree's clock-frequency for I2C0 (big-endian);  0 if it cannot be read
+hw_u32_t iic_platform_clock_hz(){
+    static const char * PATH[] = {
+        "/sys/firmware/devicetree/base/axi/i2c@e0004000/clock-frequency",
+        "/sys/firmware/devicetree/base/amba/i2c@e0004000/clock-frequency"};
+    for (int i = 0; i < 2; i++) {
+        hw_u8_t b[4];
+        int fd = open(PATH[i], O_RDONLY);
+        if (fd < 0) continue;
+        ssize_t n = read(fd, b, 4);
+        close(fd);
+        if (n == 4) return ((hw_u32_t) b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+    }
+    return 0;
+}
+
+
 //
 // GPIO
 //

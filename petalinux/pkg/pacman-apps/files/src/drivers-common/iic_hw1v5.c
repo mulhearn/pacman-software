@@ -223,6 +223,40 @@ void iic_hw1v5_write_mux_reg(hw_val_t side, hw_val_t reg, hw_val_t value){
   max14661_write_reg(side ? ADDR_MUX_N : ADDR_MUX_P, reg, value);
 }
 
+// *** Stress sweep (iic_check_stress) ***
 
-
+// Sweep k:  the DACs (only with dacs:  one channel written, read back, set to 0), the MUX shadow
+// registers (written, read back, left at 0), the power monitors' ID (against sweep 0).  0 if every
+// read matched, else 1 with the device in *bad;  *n counts the transactions.
+int iic_hw1v5_stress_sweep(hw_u32_t k, bool dacs, hw_u8_t * bad, hw_u32_t * n){
+  static const hw_u8_t DAC[2] = { ADDR_DAC_VDDA, ADDR_DAC_VDDD };
+  static hw_u8_t pac_id[6];
+  hw_val_t v = (0xA5C3 + 0x9E37 * k) & 0xFFFF;
+  if (dacs){
+    for (int d = 0; d < 2; d++){
+      hw_u8_t chan = k % 16;
+      ad5677_set_voltage(DAC[d], chan, v);
+      hw_val_t got = ad5677_read(DAC[d], chan);
+      ad5677_set_voltage(DAC[d], chan, 0);
+      *n += 3;
+      if (got != v) { *bad = DAC[d];  return 1; }
+    }
+  }
+  for (int c = 0; c < 2; c++){
+    for (hw_val_t common = 0; common < 2; common++){
+      max14661_write_shadow(MUX_CHIP[c], common, v);
+      hw_val_t got = max14661_read_shadow(MUX_CHIP[c], common);
+      max14661_write_shadow(MUX_CHIP[c], common, 0);
+      *n += 6;
+      if (got != v) { *bad = MUX_CHIP[c];  return 1; }
+    }
+  }
+  for (int i = 0; i < 6; i++){
+    hw_u8_t id = pac1944_id(ADDR_ADC_TILES + i);   // ADDR_ADC_BOARD = ADDR_ADC_TILES + 5
+    *n += 1;
+    if (k == 0) pac_id[i] = id;
+    else if (id != pac_id[i]) { *bad = ADDR_ADC_TILES + i;  return 1; }
+  }
+  return 0;
+}
 

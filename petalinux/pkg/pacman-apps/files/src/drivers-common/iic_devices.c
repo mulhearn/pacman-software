@@ -25,6 +25,16 @@ void ad5677_set_voltage(hw_u8_t addr, hw_u8_t chan, hw_val_t val) {
   iic_write(addr, reg, buf, 2);
 }
 
+#define AD5677_READBACK   0x90   // Readback command, OR the channel
+
+hw_val_t ad5677_read(hw_u8_t addr, hw_u8_t chan) {
+  assert(chan < AD5677_NUM_CHAN);
+  hw_u8_t cmd[3] = { AD5677_READBACK | chan, 0, 0 };   // The full command:  1 byte is refused
+  hw_u8_t buf[2];
+  iic_write_read(addr, cmd, 3, buf, 2, true);
+  return ((hw_val_t) buf[0] << 8) | buf[1];
+}
+
 static hw_val_t pac1944_adc_dn(hw_u8_t addr, hw_u8_t reg){
   hw_u8_t buf[2];
 
@@ -53,6 +63,14 @@ hw_val_t pac1944_i_dn(hw_u8_t addr, hw_val_t chan){
   return (chan < 4) ? pac1944_adc_dn(addr, PAC1944_REG_CURR_BASE + chan) : 0;
 }
 
+#define PAC1944_REG_MANUFACTURER 0xFE
+
+hw_u8_t pac1944_id(hw_u8_t addr){
+  hw_u8_t id;
+  iic_read(addr, PAC1944_REG_MANUFACTURER, &id, 1, false);
+  return id;
+}
+
 #define MAX14661_REG_DIR0   0x00  // switch state:  DIR0-1 COMA, DIR2-3 COMB
 #define MAX14661_REG_SHDW0  0x10  // shadow:  same layout
 #define MAX14661_REG_CMD_A  0x14  // CMD_B follows
@@ -75,12 +93,26 @@ hw_val_t max14661_read(hw_u8_t addr, hw_val_t common){
   return ((hw_val_t) hi << 8) | lo;
 }
 
+hw_val_t max14661_read_shadow(hw_u8_t addr, hw_val_t common){
+  hw_u8_t lo, hi;
+  iic_read(addr, MAX14661_REG_SHDW0 + 2*common,     &lo, 1, false);
+  iic_read(addr, MAX14661_REG_SHDW0 + 2*common + 1, &hi, 1, false);
+  return ((hw_val_t) hi << 8) | lo;
+}
+
 void max14661_write_reg(hw_u8_t addr, hw_u8_t reg, hw_u8_t value) {
   iic_write(addr, reg, &value, 1);
 }
 
 #define INA220_REG_I       0x1        // Shunt Voltage Register
 #define INA220_REG_V       0x2        // BUS Voltage Register
+#define INA220_REG_CONFIG  0x0        // Configuration Register
+
+hw_val_t ina220_config(hw_u8_t addr){
+  hw_u8_t buf[2];
+  iic_read(addr, INA220_REG_CONFIG, buf, 2, true);
+  return (((hw_val_t) buf[0]) << 8) | buf[1];
+}
 
 
 hw_val_t ina220_v_adc_dn(hw_u8_t addr){
@@ -113,6 +145,13 @@ hw_val_t ina220_i_adc_dn(hw_u8_t addr){
 #define ADS1219_REG_RDATA      0x10
 #define ADS1219_MASK_READY     0x80
 #define ADS1219_SHIFT_MUX      5
+#define ADS1219_REG_CONFIG     0x20   // RREG of the configuration register
+
+hw_u8_t ads1219_config(hw_u8_t addr){
+  hw_u8_t cfg;
+  iic_read(addr, ADS1219_REG_CONFIG, &cfg, 1, true);
+  return cfg;
+}
 
 hw_val_t ads1219_adc_dn(hw_u8_t addr, hw_u8_t mux){
   int ready = 0;
