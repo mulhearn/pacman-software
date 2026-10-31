@@ -146,11 +146,17 @@ void asic_config_root(){
 
   usleep(10000);
 
-  NUM_WORDS = 2;
+  NUM_WORDS = 6;
   //piso downstream:
   asic_config_write(&payload[0], CHIP_ID, 125, 0x1);
   //piso upstream:
-  asic_config_write(&payload[2], CHIP_ID, 124, 0x3);
+  asic_config_write(&payload[2], CHIP_ID, 124, 0x2);
+  //tx slices, all on:
+  asic_config_write(&payload[4], CHIP_ID, 239, 0xFF);
+  asic_config_write(&payload[6], CHIP_ID, 240, 0xFF);
+  //tx current per slice, full (active low):
+  asic_config_write(&payload[8], CHIP_ID, 241, 0x00);
+  asic_config_write(&payload[10], CHIP_ID, 242, 0x00);
 
   for (unsigned i=0; i< NUM_WORDS; i++){
     asic_print_packet_summary(&payload[2*i]);
