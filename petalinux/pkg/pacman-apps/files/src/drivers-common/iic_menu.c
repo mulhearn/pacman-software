@@ -294,7 +294,7 @@ void iic_check_sma(bool pause){
     return;
   }
   if (pause)
-    check_pause("R28 is across the SMA jacks J1001 (P) and J14 (N):  100 ohm +/- 10% on a DMM.");
+    check_pause("R28 is across the SMA jacks J1001 (P) and J14 (N):  100 ohm +/- 20% on a DMM.");
   iic_set_mux_open();
   if (iic_platform_status())
     check_result("FAIL", "sma_r28", "I2C error (status 0x%x)", (unsigned) iic_platform_status());
