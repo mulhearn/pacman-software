@@ -185,7 +185,6 @@ static void usage(){
          RXTX_LOOPBACK_PACKETS);
   printf("  --no_i2c       skip everything on I2C\n");
   printf("  --sweeps N     --i2c_stress sweeps (default %d)\n", IIC_STRESS_SWEEPS);
-  printf("  --skip_ads1219 --i2c_stress without the 1v4's ADS1219s (control run)\n");
   printf("  --no_pause     no pauses:  --blink blinks a fixed time;  --sma sets the MUX, then\n");
   printf("                 opens it\n");
   printf("  --help         this message\n");
@@ -199,7 +198,7 @@ static void usage(){
 // The tests, in run order;  run with the modifiers
 typedef struct {
   hw_u32_t tile_mask, ber_bits, sweeps;
-  bool no_iic, pause, skip_ads1219;
+  bool no_iic, pause;
 } hwcheck_opts_t;
 
 static void run_read_only(const hwcheck_opts_t * o)   { read_only(o->no_iic); }
@@ -213,9 +212,7 @@ static void run_ana_mon(const hwcheck_opts_t * o)     { adc_check_ana_mon(o->til
 static void run_adc(const hwcheck_opts_t * o)         { (void) o;  adc_check(); }
 static void run_blink(const hwcheck_opts_t * o)       { led_check_blink(o->pause); }
 static void run_sma(const hwcheck_opts_t * o)         { iic_check_sma(o->pause); }
-static void run_i2c_stress(const hwcheck_opts_t * o)  {
-  iic_check_stress(o->sweeps, o->skip_ads1219);
-}
+static void run_i2c_stress(const hwcheck_opts_t * o)  { iic_check_stress(o->sweeps); }
 
 static const struct {
   const char * option;
@@ -237,16 +234,15 @@ static const struct {
 
 int main(int argc, char * argv[]){
   // OPT_TEST + test index for the tests
-  enum { OPT_TILE_MASK = 1, OPT_BER_BITS, OPT_NO_I2C, OPT_NO_PAUSE, OPT_SWEEPS, OPT_SKIP_ADS1219,
-         OPT_HELP, OPT_TEST };
-  static struct option opts[NTESTS + 8];   // the tests, the 7 modifiers, the end
+  enum { OPT_TILE_MASK = 1, OPT_BER_BITS, OPT_NO_I2C, OPT_NO_PAUSE, OPT_SWEEPS, OPT_HELP,
+         OPT_TEST };
+  static struct option opts[NTESTS + 7];   // the tests, the 6 modifiers, the end
   static const struct option MODIFIERS[] = {
     {"tile_mask", required_argument, 0, OPT_TILE_MASK},
     {"ber_bits",  required_argument, 0, OPT_BER_BITS},
     {"no_i2c",    no_argument,       0, OPT_NO_I2C},
     {"no_pause",  no_argument,       0, OPT_NO_PAUSE},
     {"sweeps",    required_argument, 0, OPT_SWEEPS},
-    {"skip_ads1219", no_argument,    0, OPT_SKIP_ADS1219},
     {"help",      no_argument,       0, OPT_HELP},
   };
   for (int i = 0; i < NTESTS; i++)
@@ -257,7 +253,7 @@ int main(int argc, char * argv[]){
   opts[NTESTS + NMOD] = (struct option) {0, 0, 0, 0};
 
   bool selected[NTESTS] = {false};
-  hwcheck_opts_t o = {0x3FF, 0, IIC_STRESS_SWEEPS, false, true, false};
+  hwcheck_opts_t o = {0x3FF, 0, IIC_STRESS_SWEEPS, false, true};
   bool bad = false;
   int c;
   while ((c = getopt_long(argc, argv, "", opts, NULL)) != -1){
@@ -274,7 +270,6 @@ int main(int argc, char * argv[]){
       o.sweeps = strtoul(optarg, NULL, 0);
       if (o.sweeps == 0) bad = true;
       break;
-    case OPT_SKIP_ADS1219: o.skip_ads1219 = true;  break;
     case OPT_HELP:      usage();  return EXIT_PASS;
     default:            usage();  return EXIT_USAGE;
     }

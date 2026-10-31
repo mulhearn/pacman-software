@@ -304,9 +304,9 @@ void iic_check_sma(bool pause){
 }
 
 // One stress sweep on the selected hardware (iic.c)
-int iic_stress_sweep(hw_u32_t k, bool dacs, bool ads1219, hw_u8_t * bad, hw_u32_t * n);
+int iic_stress_sweep(hw_u32_t k, bool dacs, hw_u8_t * bad, hw_u32_t * n);
 
-void iic_check_stress(hw_u32_t sweeps, bool skip_ads1219){
+void iic_check_stress(hw_u32_t sweeps){
   global_status_t gs;
   get_global_status(&gs);
   bool dacs = !(gs.enables & (GLOBAL_ENABLE_TILES | GLOBAL_ENABLE_TILE_POWER));
@@ -324,7 +324,7 @@ void iic_check_stress(hw_u32_t sweeps, bool skip_ads1219){
   int r = 0;
   start_hw_timer();
   for (k = 0; k < sweeps; k++){
-    r = iic_stress_sweep(k, dacs, !skip_ads1219, &bad, &n);
+    r = iic_stress_sweep(k, dacs, &bad, &n);
     if (r || iic_platform_status()) break;
   }
   stop_hw_timer();
@@ -340,10 +340,9 @@ void iic_check_stress(hw_u32_t sweeps, bool skip_ads1219){
                  (unsigned) k + 1, (unsigned) sweeps, bad);
   else
     check_result("PASS", "i2c_stress", "%u sweeps, %u transactions in %.2f s (%.0f per s, clock %u "
-                 "kHz)%s%s",
+                 "kHz)%s",
                  (unsigned) sweeps, (unsigned) n, s, s > 0 ? n / s : 0.0,
-                 (unsigned) iic_platform_clock_hz() / 1000, dacs ? "" : ", no DACs",
-                 skip_ads1219 ? ", no ADS1219s" : "");
+                 (unsigned) iic_platform_clock_hz() / 1000, dacs ? "" : ", no DACs");
 }
 
 void iic_menu(){
@@ -371,7 +370,7 @@ void iic_menu(){
       iic_check_sma(true);
       break;
     case 'z':
-      iic_check_stress(IIC_STRESS_SWEEPS, false);
+      iic_check_stress(IIC_STRESS_SWEEPS);
       break;
     case 'v':
       iic_toggle_hardware_version();

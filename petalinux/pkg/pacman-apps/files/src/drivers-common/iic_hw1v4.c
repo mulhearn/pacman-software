@@ -135,10 +135,10 @@ int iic_hw1v4_mux_select(hw_val_t common, hw_val_t source, hw_val_t term){
 // *** Stress sweep (iic_check_stress) ***
 
 // Sweep k:  the DAC (only with dacs:  one channel written, read back, set to 0), the MUX shadow
-// registers (written, read back, left at 0), the INA220s' and (with ads1219) the ADS1219s'
+// registers (written, read back, left at 0), the INA220s' and the ADS1219s'
 // configuration (against sweep 0).  0 if every read matched, else 1 with the device in *bad;  *n
 // counts the transactions.
-int iic_hw1v4_stress_sweep(hw_u32_t k, bool dacs, bool ads1219, hw_u8_t * bad, hw_u32_t * n){
+int iic_hw1v4_stress_sweep(hw_u32_t k, bool dacs, hw_u8_t * bad, hw_u32_t * n){
   static hw_val_t ina_cfg[MAX_TILE];
   static hw_u8_t ads_cfg[MAX_TILE/2];
   hw_val_t v = (0xA5C3 + 0x9E37 * k) & 0xFFFF;
@@ -163,7 +163,7 @@ int iic_hw1v4_stress_sweep(hw_u32_t k, bool dacs, bool ads1219, hw_u8_t * bad, h
     if (k == 0) ina_cfg[i] = cfg;
     else if (cfg != ina_cfg[i]) { *bad = ADDR_ADC_VDDA + i;  return 1; }
   }
-  for (int i = 0; ads1219 && i < MAX_TILE/2; i++){
+  for (int i = 0; i < MAX_TILE/2; i++){
     hw_u8_t cfg = ads1219_config(ADDR_ADC_VDDD + i);
     *n += 1;
     if (k == 0) ads_cfg[i] = cfg;

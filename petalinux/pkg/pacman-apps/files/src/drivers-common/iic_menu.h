@@ -45,8 +45,7 @@ void iic_check_sma(bool pause);
 #define IIC_STRESS_SWEEPS 100   // The default number of sweeps for stress test
   
 // Stress the I2C bus with safe transactions over every device
-// skip_ads1219:  leave out the 1v4's ADS1219s.
-void iic_check_stress(hw_u32_t sweeps, bool skip_ads1219);
+void iic_check_stress(hw_u32_t sweeps);
 
 #ifdef __cplusplus
 }
