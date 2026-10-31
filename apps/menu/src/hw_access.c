@@ -57,7 +57,7 @@ hw_ptr_t dma_safe_buffer(hw_addr_t addr, hw_addr_t size){
 
 // I2C device parameters
 #define IIC_DEVICE_ID       XPAR_XIICPS_0_DEVICE_ID
-#define IIC_SCLK_RATE       200000
+#define IIC_SCLK_RATE       100000  // 100 kHz robust setting
 #define IIC_BUS_TIMEOUT_US  10000   // Longest wait for the bus to go idle
 #define IIC_SCL_MIO         10      // I2C0 SCL and SDA (MIO 10 and 11)
 #define IIC_SDA_MIO         11
