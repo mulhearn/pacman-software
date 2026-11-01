@@ -399,7 +399,9 @@ void asic_menu(){
     printf("(f) send full reset (i) send internal reset (c) config root chip \r\n");
     printf("(a) request all registers (h) hello ASIC (r) read RX \r\n");
     printf("(l) run ASIC loopback test (n) toggle chip id \r\n");
-    char input = input_choice();
+    int input = input_choice();
+    if (input == INPUT_END)
+      return;
     printf("INFO: selected %c\r\n", input);
 
     switch(input){

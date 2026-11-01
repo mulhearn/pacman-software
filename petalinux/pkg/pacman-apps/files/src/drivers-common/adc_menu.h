@@ -8,6 +8,11 @@
 extern "C" {
 #endif
 
+// Menu interface to the ADC driver:
+void adc_menu();
+
+// Menu options:
+
 // Check the ADC registers, then the test DAC into the ADC through the MUX (no card):  direct, and
 // through both series loops.
 void adc_check();

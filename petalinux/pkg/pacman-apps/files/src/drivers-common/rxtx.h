@@ -19,21 +19,8 @@ extern "C" {
 #define C_ADDR_RX_UART_CONFIG       0x04
 #define C_ADDR_RX_UART_CHAN         0x08
 
-// RX UART config fields (C_ADDR_RX_UART_CONFIG; firmware rx_chan.vhd):
-#define RX_CONFIG_PERIOD_SHIFT 16          // [23:16] clocks per bit
-#define RX_CONFIG_PERIOD_MASK  0x00FF0000
-#define RX_CONFIG_FLAGS_SHIFT  14          // [15:14] bit 14: start a byte despite vote dissent
-#define RX_CONFIG_FLAGS_MASK   0x0000C000
-#define RX_CONFIG_MODE_SHIFT   12          // [13:12] sampling, see RX_MODE_*
-#define RX_CONFIG_MODE_MASK    0x00003000
-#define RX_CONFIG_INPUT_SHIFT  8           // [11:8]  input select, see RX_INPUT_*
-#define RX_CONFIG_INPUT_MASK   0x00000F00
-#define RX_CONFIG_PHASE_SHIFT  0           // [7:0]   sample point
-#define RX_CONFIG_PHASE_MASK   0x000000FF
-
-#define RX_CONFIG(period, flags, mode, input, phase) \
-  ( ((period) << RX_CONFIG_PERIOD_SHIFT) | ((flags) << RX_CONFIG_FLAGS_SHIFT) | ((mode) << RX_CONFIG_MODE_SHIFT) \
-  | ((input) << RX_CONFIG_INPUT_SHIFT) | ((phase) << RX_CONFIG_PHASE_SHIFT) )
+// RX UART config word from its fields
+hw_u32_t rx_config(unsigned period, unsigned flags, unsigned mode, unsigned input, unsigned phase);
 
 #define RX_MODE_OFF           0x0          // no sampling
 #define RX_MODE_EDGE          0x1          // sample phase relative to the detected falling edge
@@ -45,20 +32,14 @@ extern "C" {
 #define RX_INPUT_PATTERN      0x4          // test pattern generator
 #define RX_INPUT_EMUL         0x8          // ASIC emulation
 
-// RX buffer config fields (C_ADDR_RX_BUFFER_CONFIG = 0xMMMMTTTT; firmware rx_buffer.vhd), 0 = no condition:
-#define RX_BUFFER_MAX_WORDS_SHIFT 16          // [31:16] max 192-bit words per DMA packet
-#define RX_BUFFER_MAX_WORDS_MASK  0xFFFF0000
-#define RX_BUFFER_TIMEOUT_SHIFT   0           // [15:0]  packet timeout, in units of 256 clocks
-#define RX_BUFFER_TIMEOUT_MASK    0x0000FFFF
-
-#define RX_BUFFER_CONFIG(max_words, timeout) \
-  ( ((max_words) << RX_BUFFER_MAX_WORDS_SHIFT) | ((timeout) << RX_BUFFER_TIMEOUT_SHIFT) )
+// RX buffer config word from its fields
+hw_u32_t rx_buffer_config(unsigned max_words, unsigned timeout);
 
 // DAQ setting (pacman-server):  0x260 words (0x3900 bytes) per packet, timeout 0x188 units (~1 ms)
-#define RX_BUFFER_CONFIG_DAQ  RX_BUFFER_CONFIG(0x260, 0x188)
+#define RX_BUFFER_CONFIG_DAQ  rx_buffer_config(0x260, 0x188)
 
 // operating default:  UART input, 10 clocks per bit, sampled 4 clocks after the falling edge
-#define RX_CONFIG_DEFAULT     RX_CONFIG(0x0A, 0, RX_MODE_EDGE, RX_INPUT_PIN, 4)
+#define RX_CONFIG_DEFAULT     rx_config(0x0A, 0, RX_MODE_EDGE, RX_INPUT_PIN, 4)
 
 #define C_ADDR_RX_UART_STARTS       0x20
 #define C_ADDR_RX_UART_BEATS        0x24
@@ -150,14 +131,26 @@ void init_rxtx(void);
 void init_tx_descriptor_ring_mode(int ring_size);
 void init_rx_descriptor_ring_mode(int ring_size);
 
-void rx_set_input(unsigned chan, unsigned input);   // RX_INPUT_*
-void rx_set_config_all(hw_u32_t config);            // broadcast to all RX UARTs
-hw_val_t rx_get_buffer_config(void);
+// Set the config of every RX UART, or of one:  a whole config word (e.g. RX_CONFIG_DEFAULT), or
+// its fields (as for rx_config).
+void rx_set_config_all(hw_u32_t config);
+void rx_set_config(unsigned chan, hw_u32_t config);
+void rx_set_config_options(unsigned chan, unsigned period, unsigned flags, unsigned mode,
+                           unsigned input, unsigned phase);
+void rx_set_config_options_all(unsigned period, unsigned flags, unsigned mode, unsigned input,
+                               unsigned phase);
+
+// Get, set the RX buffer config.
 void rx_set_buffer_config(hw_val_t config);
+hw_val_t rx_get_buffer_config(void);
+
+// Enable, disable RX UART channels.
 void rx_disable_uart(unsigned chan);
 void rx_enable_uart(unsigned chan);
 bool rx_uart_is_enabled(unsigned chan);
 
+// RX BDs filled by the DMA and not yet handed back:  valid only in the process that set up the
+// ring (the ring size is this process's).
 unsigned rx_pending(void);
 
 // menu hooks:
@@ -187,7 +180,15 @@ void get_tx_uart_status(unsigned chan, tx_uart_status_t * us);
 void read_tx_status(void);
 void read_tx_look(void);
 void toggle_tx_config(void);
-void toggle_tx_mask(void);
+// RXTX UART mask (bit u = UART u+1, 40 bits):  the UARTs the RX/TX tools use (single and batch TX,
+// the benchmarks, the loopback check).  All 40 by default.
+uint64_t rxtx_uart_mask(void);
+
+// The UART mask of the tiles in tile_mask (bit t = tile t+1):  their 4 UARTs each.
+uint64_t rxtx_tile_uarts(hw_u32_t tile_mask);
+
+// Set the RXTX UART mask.
+void rxtx_set_uart_mask(uint64_t mask);
 
 void read_rx_status(void);
 void read_rx_look(void);
@@ -197,6 +198,8 @@ void toggle_rx_test_patterns(void);
 void toggle_rx_test_pattern_delay(void);
 
 void zero_rxtx_counts(void);
+
+#define RXTX_RING_BDS 512   // BDs in each DMA ring (TX and RX) by default, as the servers use
 
 void init_rxtx_descriptor_ring_mode(int ring_size);
 unsigned rxtx_ring_size(void);   // 0: no ring set up yet in this process
@@ -214,9 +217,29 @@ void single_rx(void);
 void batch_tx(void);
 void batch_rx(void);
 
+// Results of an RX/TX loopback test.
+typedef struct {
+  unsigned tx_packets;    // DMA packets sent
+  unsigned words_sent;    // UART words sent (one per masked UART per packet)
+  unsigned words_rcvd;    // UART data words received and checked
+  unsigned words_bad;     // received words with at least one bit error
+  unsigned bit_errors;    // total bit errors in received words
+  unsigned stale_words;   // words already waiting before the check started (discarded)
+  unsigned other_words;   // received words not from a UART (sync, heartbeat, trigger)
+  unsigned stray_words;   // received words from a UART outside the mask
+  unsigned rcvd[40];      // words received per UART (stray words included)
+  unsigned bad_packets;   // RX DMA packets with an invalid size
+  unsigned tx_timeout;    // nonzero if TX stalled
+  unsigned timeout;       // nonzero if a time limit ran out:  1 the drain of stale words, 2 the check itself
+  unsigned elapsed_us;    // time spent in the check (after the drain)
+} rxtx_check_t;
 
-void benchmark_tx(void);
-void benchmark_rxtx_loopback(void);
+// Run an RX/TX loopback test for <packets> packets on the UARTs in <uart_mask>, with the existing
+// configuration:  touches no config, enables or power (all arranged by the caller), and uses the
+// DMA ring already set up.  With ber_test, every word is pseudo-random from the seed and compared
+// with the one expected next on its UART;  without, the words are only counted and timed.
+void rxtx_loopback(uint64_t uart_mask, unsigned packets,
+                   bool ber_test, hw_u32_t seed, rxtx_check_t * r);
 
 #ifdef __cplusplus
 }

@@ -120,3 +120,10 @@ void led_check_blink(bool pause){
   check_result("INFO", "led_blink", pause ? "LEDs lit in turn until Enter"
                                           : "LEDs blinked, 2 s each");
 }
+
+void blink_leds(){
+  printf("INFO: starting LED blink test...\r\n");
+  blink_red_led();
+  blink_pacman_leds();
+  printf("INFO: done with LED blink test.\r\n");
+}

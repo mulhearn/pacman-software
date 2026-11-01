@@ -11,6 +11,7 @@
 #include "capture.h"
 #include "check.h"
 #include "adc_menu.h"
+#include "iic_menu.h"
 
 #define ADC_READS     100
 #define ADC_SETTLE_US 10000
@@ -218,4 +219,41 @@ void adc_check_ana_mon(hw_u32_t tile_mask){
     check_result("PASS", "ana_mon_mux_open", "DAC 0, MUX open");
   axil_write_register(SCOPE_ADC + C_ADDR_ADC_CONFIG, config0);
   adc_set_sleep(1);
+}
+
+void adc_menu(){
+  while(1){
+    printf("ADC MENU:  choose an option:\r\n");
+    printf("(x) main menu (r) read ADC registers (s) toggle ADC sleep (e) toggle ADC enable \r\n");
+    printf("(d) toggle DAC (c) check ADC (registers, test DAC) (m) check analog monitors \r\n");
+    int input = input_choice();
+    if (input == INPUT_END)
+      return;
+    printf("INFO: selected %c\r\n", input);
+
+    switch(input){
+    case 'x':
+      return;
+    case 'r':
+      adc_read_registers();
+      break;
+    case 's':
+      adc_toggle_sleep();
+      break;
+    case 'e':
+      adc_toggle_config();
+      break;
+    case 'd':
+      iic_toggle_test_dac();
+      break;
+    case 'c':
+      adc_check();
+      break;
+    case 'm':
+      adc_check_ana_mon(0x3FF);
+      break;
+    default:
+      printf("invalid selection...\r\n");
+    }
+  }
 }

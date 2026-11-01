@@ -270,10 +270,15 @@ void stop_hw_timer();
 hw_u32_t hw_timer_elapsed_us();
 
 //
-// Menu option utility:
+// Menu input:
 //
-// return last character pressed before enter:
-char input_choice();
+// Every menu reads its choice this way:  a letter, then Enter.
+
+#define INPUT_END  -1   // input_choice() at the end of input (stdin closed):  leave the menu
+
+// Prompt, read one line from the console (echoed, Enter included) and return its first character
+// (0 for an empty line), or INPUT_END.
+int input_choice();
 
 #ifdef __cplusplus
 }

@@ -15,24 +15,21 @@
 extern "C" {
 #endif
 
-// Tile mask presets (bit t = tile t+1), in the order the toggle steps through them:
-#define HWCHECK_TILE_MASK_ALL       0x3FF  // every tile (the default)
-#define HWCHECK_TILE_MASK_TILE_1    0x001  // tile 1 only
-#define HWCHECK_TILE_MASK_HW1V4     0x0FF  // tiles 1-8 (hw1v4)
-#define HWCHECK_TILE_MASK_LOOPBACK  0x003  // the loopback test card (bench 1v5)
-#define HWCHECK_TILE_MASK_ATC       0x018  // the ATC test card (bench 1v5)
-
-// menu interface to the hardware tests:
+// Menu interface to the hardware tests:
 void hwcheck_menu();
 
-// menu options:
-
-// Step the menu's tile mask to the next preset.
+// Get, toggle (to the next preset) or set the menu's tile mask (bit t = tile t+1).
+unsigned hwcheck_get_tile_mask();
 void hwcheck_toggle_tile_mask();
+void hwcheck_set_tile_mask(unsigned mask);
 
 // Report the firmware and board status:  J5, versions and build, data path, and (unless no_iic)
 // the board and tile monitors.  Read only:  allowed with J5 installed.
 void hwcheck_read_only(bool no_iic);
+
+// Run the RX/TX loopback test, using UART RX/TX with a loopback card present, on the menu's tile
+// mask.  Each tile from the tile mask one by one, then all at once.
+void hwcheck_loopback();
 
 #ifdef __cplusplus
 }

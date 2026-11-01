@@ -436,19 +436,25 @@ hw_u32_t hw_timer_elapsed_us(){
 
 
 
-char input_choice(void) {
-  char c = 0, last = 0;
-  print("Enter choice and press return: ");
+int input_choice(void) {
+  static char prev = 0;
+  int first = 0, n = 0;
 
+  print("> ");
   while (1) {
-    c = inbyte();   // blocking read from UART
-
-    if (c == '\r' || c == '\n') {
-      return last;
+    char c = inbyte();   // blocking read from UART
+    // The newline of a CR LF pair ends no line of its own:
+    if (c == '\n' && prev == '\r') {
+      prev = 0;
+      continue;
     }
-
-    // echo so user sees what they typed
+    prev = c;
+    if (c == '\r' || c == '\n') {
+      print("\r\n");
+      return first;
+    }
     outbyte(c);
-    last = c;
+    if (n++ == 0)
+      first = c;
   }
 }

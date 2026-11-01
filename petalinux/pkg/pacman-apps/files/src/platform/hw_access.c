@@ -665,17 +665,23 @@ hw_u32_t hw_timer_elapsed_us(){
   return elapsed_us;
 }
 
-char input_choice(){
-  char c = 0, last = 0;
+int input_choice(){
+  char line[64];
+  int c, n = 0;
 
-  printf("Enter choice and press return: ");
+  printf("> ");
   fflush(stdout);
-
-  while (1) {
-    c = getchar();
-    if (c == '\n' || c == '\r')
-      return last;
-    last = c;
-    usleep(1000);
+  while ((c = getchar()) != EOF && c != '\n'){
+    if (c != '\r' && n < (int) sizeof(line) - 1)
+      line[n++] = c;
   }
+  line[n] = 0;
+  if (c == EOF && n == 0){
+    printf("\r\n");
+    return INPUT_END;
+  }
+  // A terminal echoes the line itself;  piped input is echoed here:
+  if (!isatty(STDIN_FILENO))
+    printf("%s\r\n", line);
+  return line[0];
 }

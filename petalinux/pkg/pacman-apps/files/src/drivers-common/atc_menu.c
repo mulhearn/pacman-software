@@ -142,7 +142,7 @@ void atc_check_outputs(hw_u32_t tile_mask){
       continue;
     }
     set_global_enables(1u << t);
-    rx_set_config_all(RX_TEST_PIN);
+    rx_set_config_all(RX_CONFIG_DEFAULT);
     for (unsigned u = 0; u < 40; u++)
       if (u < 4u*t || u >= 4u*t + 4) rx_disable_uart(u);
     usleep(10000);
@@ -166,7 +166,9 @@ void atc_menu(){
     printf("(r) read ATC registers (n) read ATC counts (t) toggle ATC destinations (s) toggle ATC run \r\n");
     printf("(a) poke A (b) poke B (c) poke C (d) poke D \r\n");
     printf("(o) check ATC outputs (i) check LEMO inputs \r\n");
-    char input = input_choice();
+    int input = input_choice();
+    if (input == INPUT_END)
+      return;
     printf("INFO: selected %c\r\n", input);
 
     switch(input){

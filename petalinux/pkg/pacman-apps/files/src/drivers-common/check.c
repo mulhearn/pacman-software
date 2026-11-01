@@ -41,11 +41,5 @@ void check_counts(int * npass, int * nfail, int * nskip){
 void check_pause(const char * prompt){
   printf("OPERATOR:  %s  Press Enter when done.\r\n", prompt);
   fflush(stdout);
-#ifdef _LINUX
-  char line[64];
-  if (fgets(line, sizeof(line), stdin) == NULL)   // end of input (a scripted run) ends the pause
-    printf("\n");
-#else
   input_choice();
-#endif
 }

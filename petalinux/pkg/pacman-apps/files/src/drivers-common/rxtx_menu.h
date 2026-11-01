@@ -8,46 +8,40 @@
 extern "C" {
 #endif
 
-// RX test configurations (whole RX UART config words), shared by pacman_menu and pacman_hwcheck:
-#define RX_TEST_PIN            RX_CONFIG_DEFAULT                                     // normal: UART input
-#define RX_TEST_LOOPBACK       RX_CONFIG(0x0A, 0, RX_MODE_EDGE,  RX_INPUT_LOOPBACK, 4)  // full internal loopback
-#define RX_TEST_PATTERN        RX_CONFIG(0x0A, 0, RX_MODE_EDGE,  RX_INPUT_PATTERN,  4)  // test pattern
-#define RX_TEST_LOOPBACK_FIXED RX_CONFIG(0x0A, 0, RX_MODE_FIXED, RX_INPUT_LOOPBACK, 1)  // loopback, edge detect disabled
-#define RX_TEST_LOOPBACK_NOISE RX_CONFIG(0x0A, 1, RX_MODE_EDGE,  RX_INPUT_LOOPBACK, 8)  // loopback, intentional noise
-#define RX_TEST_LOOPBACK_FAIL  RX_CONFIG(0x0A, 1, RX_MODE_EDGE,  RX_INPUT_LOOPBACK, 9)  // loopback, intentional failures
+// The loopback check's default length, in packets:  in use until set.
+#define RXTX_LOOPBACK_PACKETS 10000
+
+// Get, toggle (to the next of its presets) or set the loopback check's length.
+unsigned rxtx_loopback_packets(void);
+void rxtx_toggle_loopback_packets(void);
+void rxtx_set_loopback_packets(unsigned packets);
+
+// Toggle the RXTX UART mask to the next of its presets (set:  rxtx_set_uart_mask).
+void rxtx_toggle_uart_mask(void);
+
+// Menu interface to the RX/TX driver:
+void rxtx_menu(void);
+
+// Menu options:
+
+// The BD ring size the RX/TX menu sets up (init descriptor ring mode):  RXTX_RING_BDS until
+// changed.
+unsigned rxtx_menu_ring_bds(void);
+
+// Step the menu's BD ring size through the powers of two, 16 to RXTX_RING_BDS;  the ring itself
+// is not touched until it is set up again.
+void toggle_rxtx_ring_bds(void);
 
 void toggle_rx_config(void);
 
-// Loopback check with random data:  every TX packet carries a pseudo-random 64-bit
-// word for each UART in uart_mask (bit u: UART u, 0-39); each received word is compared
-// with the word expected next on its UART.  A word from a UART outside the mask is a
-// stray word.  Uses the current RX config (pin or internal loopback) and the DMA ring
-// already set up (init_rxtx_descriptor_ring_mode); the ring is not touched.
-#define RXTX_ALL_UARTS 0xFFFFFFFFFFULL
-typedef struct {
-  unsigned tx_packets;    // DMA packets sent
-  unsigned words_sent;    // UART words sent (one per masked UART per packet)
-  unsigned words_rcvd;    // UART data words received and checked
-  unsigned words_bad;     // received words with at least one bit error
-  unsigned bit_errors;    // total bit errors in received words
-  unsigned stale_words;   // words already waiting before the check started (discarded)
-  unsigned other_words;   // received words not from a UART (sync, heartbeat, trigger)
-  unsigned stray_words;   // received words from a UART outside the mask
-  unsigned rcvd[40];      // words received per UART (stray words included)
-  unsigned bad_packets;   // RX DMA packets with an invalid size
-  unsigned tx_timeout;    // nonzero if TX stalled
-  unsigned timeout;       // nonzero if a time limit ran out:  1 the drain of stale words, 2 the check itself
-  unsigned elapsed_us;    // time spent in the check (after the drain)
-} rxtx_check_t;
+// Speed benchmark, TX only.
+void rxtx_benchmark_tx(void);
 
-void rxtx_loopback_run(unsigned tx_packets, hw_u32_t seed, uint64_t uart_mask, rxtx_check_t * r);
-void print_rxtx_check(const rxtx_check_t * r);
-void menu_check_rxtx_loopback(void);
+// Speed benchmark, RX/TX loopback.
+void rxtx_benchmark_loopback(void);
 
-// Check the UART loopback through the pins (loopback card), one tile in tile_mask at a time:
-// ber_bits random bits per tile (0:  the default length).
-#define RXTX_LOOPBACK_PACKETS 10000   // The default length (ber_bits 0), in packets
-void rxtx_check_loopback(hw_u32_t tile_mask, hw_u32_t ber_bits);
+// Measure the bit error rate of the RX/TX loopback.
+void rxtx_ber_loopback(void);
 
 #ifdef __cplusplus
 }

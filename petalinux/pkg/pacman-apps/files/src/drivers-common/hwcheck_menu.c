@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "hw_access.h"
 #include "global.h"
@@ -14,7 +15,7 @@
 #include "adc_menu.h"
 #include "hwcheck_menu.h"
 
-static hw_u32_t G_TILE_MASK = HWCHECK_TILE_MASK_ALL;
+static hw_u32_t G_TILE_MASK = 0x3FF;
 
 // *** READ ONLY STATUS REPORT ***
 
@@ -121,12 +122,128 @@ void hwcheck_read_only(bool no_iic){
     read_only_iic();
 }
 
+// *** LOOPBACK TEST ***
+
+static void loopback_counters(const char * name, uint64_t uart_mask){
+  rx_uart_status_t us;
+  unsigned frame = 0, noise = 0, lost = 0;
+  for (unsigned u = 0; u < 40; u++){
+    if (!((uart_mask >> u) & 1)) continue;
+    get_rx_uart_status(u, &us);
+    frame += us.frame_err;
+    noise += us.noise;
+    lost  += us.lost;
+  }
+  check_result("INFO", name, "frame errors %u, noise %u, lost %u", frame, noise, lost);
+}
+
+static const char * loopback_limit(const rxtx_check_t * r){
+  return r->timeout == 1 ? ", TIME LIMIT (drain)" : r->timeout == 2 ? ", TIME LIMIT" : "";
+}
+
+// One loopback run on the tiles in tiles (power on, RX on their UARTs only), with result lines
+// under prefix;  returns the stray words.
+static unsigned loopback_run(const char * prefix, hw_u32_t tiles, hw_u32_t seed){
+  rxtx_check_t r;
+  char name[48];
+  uint64_t uarts = rxtx_tile_uarts(tiles);
+
+  set_global_enables(GLOBAL_ENABLE_TILE_POWER | tiles);
+  rx_set_config_all(RX_CONFIG_DEFAULT);
+  for (unsigned u = 0; u < 40; u++)
+    if (!((uarts >> u) & 1)) rx_disable_uart(u);
+  rxtx_set_uart_mask(uarts);
+  usleep(10000);
+  zero_rxtx_counts();
+  rxtx_loopback(uarts, rxtx_loopback_packets(), true, seed, &r);
+
+  bool words_ok = (r.words_sent > 0) && (r.words_rcvd == r.words_sent) && !r.tx_timeout && !r.timeout
+                  && !r.bad_packets;
+  snprintf(name, sizeof(name), "%s_loopback", prefix);
+  check_result(words_ok ? "PASS" : "FAIL", name, "%u of %u received in %.2f s%s%s", r.words_rcvd,
+               r.words_sent, r.elapsed_us / 1e6, r.tx_timeout ? ", TX TIMEOUT" : "",
+               loopback_limit(&r));
+  unsigned long long bits = 64ULL * r.words_rcvd;
+  snprintf(name, sizeof(name), "%s_bit_errors", prefix);
+  if (r.bit_errors)
+    check_result("FAIL", name, "%u in %llu bits (%u words):  BER %.1e", r.bit_errors, bits,
+                 r.words_bad, (double) r.bit_errors / (double) bits);
+  else
+    check_result(bits ? "PASS" : "FAIL", name, "0 in %llu bits:  BER < %.1e (95%% CL)", bits,
+                 bits ? 3.0 / (double) bits : 1.0);
+  snprintf(name, sizeof(name), "%s_rx_counters", prefix);
+  loopback_counters(name, uarts);
+  if (r.stray_words){
+    char list[128] = "";
+    for (unsigned u = 0; u < 40; u++){
+      if (((uarts >> u) & 1) || !r.rcvd[u]) continue;
+      size_t n = strlen(list);
+      snprintf(list + n, sizeof(list) - n, " UART %u: %u", u+1, r.rcvd[u]);
+    }
+    snprintf(name, sizeof(name), "%s_stray", prefix);
+    check_result("FAIL", name, "%u words on disabled UARTs:%s", r.stray_words, list);
+  }
+  return r.stray_words;
+}
+
+void hwcheck_loopback(){
+  hw_u32_t tile_mask = G_TILE_MASK;
+  unsigned stray = 0;
+  char prefix[16];
+
+  global_status_t gs;
+  get_global_status(&gs);
+  hw_val_t enables = gs.enables;
+  hw_val_t buffer_enables = axil_read_register(SCOPE_RX + UART_GLOBAL + C_ADDR_RX_BUFFER_ENABLES);
+  hw_val_t buffer_config = rx_get_buffer_config();
+  uint64_t uart_mask = rxtx_uart_mask();
+  axil_write_register(SCOPE_RX + UART_GLOBAL + C_ADDR_RX_BUFFER_ENABLES, 0);
+  rx_set_buffer_config(RX_BUFFER_CONFIG_DAQ);
+  for (int t = 0; t < 10; t++){
+    iic_set_vdda_dn(t, 0);
+    iic_set_vddd_dn(t, 0);
+  }
+
+  for (int t = 0; t < 10; t++){
+    snprintf(prefix, sizeof(prefix), "tile_%02d", t+1);
+    if (!((tile_mask >> t) & 1)){
+      char name[32];
+      snprintf(name, sizeof(name), "%s_loopback", prefix);
+      check_result("SKIP", name, "not in the tile mask 0x%03x", (unsigned) tile_mask);
+      continue;
+    }
+    stray += loopback_run(prefix, 1u << t, 1 + t);
+  }
+  if (tile_mask)
+    stray += loopback_run("all_tiles", tile_mask, 11);
+
+  rx_set_config_all(RX_CONFIG_DEFAULT);
+  rxtx_set_uart_mask(uart_mask);
+  set_global_enables(enables);
+  rx_set_buffer_config(buffer_config);
+  axil_write_register(SCOPE_RX + UART_GLOBAL + C_ADDR_RX_BUFFER_ENABLES, buffer_enables);
+  if (tile_mask)
+    check_result(stray ? "FAIL" : "PASS", "loopback_stray", "%u words on disabled UARTs", stray);
+}
+
 // *** MENU ***
 
+unsigned hwcheck_get_tile_mask(){
+  return G_TILE_MASK;
+}
+
+void hwcheck_set_tile_mask(unsigned mask){
+  G_TILE_MASK = mask & 0x3FF;
+}
+
 void hwcheck_toggle_tile_mask(){
-  static const hw_u32_t presets[] = {HWCHECK_TILE_MASK_ALL, HWCHECK_TILE_MASK_TILE_1,
-                                     HWCHECK_TILE_MASK_HW1V4, HWCHECK_TILE_MASK_LOOPBACK,
-                                     HWCHECK_TILE_MASK_ATC};
+  static const hw_u32_t presets[] = {
+    0x3FF,   // every tile (the default)
+    0x001,   // tile 1 only
+    0x0FF,   // tiles 1-8 (hw1v4)
+    0x003,   // the loopback test card (bench 1v5)
+    0x018,   // the ATC test card (bench 1v5)
+  };
   static int mode = 0;
   mode = (mode + 1) % (int) (sizeof(presets) / sizeof(presets[0]));
   G_TILE_MASK = presets[mode];
@@ -150,7 +267,7 @@ static void run_test(const char * name, bool needs_iic, void (*test)(void)){
 }
 
 static void test_power()       { iic_check_power(G_TILE_MASK); }
-static void test_loopback()    { rxtx_check_loopback(G_TILE_MASK, 0); }
+static void test_loopback()    { hwcheck_loopback(); }
 static void test_atc_outputs() { atc_check_outputs(G_TILE_MASK); }
 static void test_lemo_inputs() { atc_check_lemo_inputs(); }
 static void test_ana_mon()     { adc_check_ana_mon(G_TILE_MASK); }
@@ -167,7 +284,9 @@ void hwcheck_menu(){
     printf("(x) Exit hardware check menu (t) toggle tile mask (o) read only \r\n");
     printf("(p) power (l) loopback (a) ATC outputs (i) LEMO inputs (m) analog monitor \r\n");
     printf("(d) ADC (b) blink (s) SMA (z) I2C stress \r\n");
-    char input = input_choice();
+    int input = input_choice();
+    if (input == INPUT_END)
+      return;
     printf("INFO: selected %c\r\n", input);
 
     switch(input){

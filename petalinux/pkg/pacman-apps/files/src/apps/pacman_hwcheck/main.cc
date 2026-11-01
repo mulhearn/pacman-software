@@ -70,7 +70,8 @@ static void usage(){
   printf("  --read_only    status report (allowed with J5 installed)\n");
   printf("  --power        board rails;  each tile in the mask swept into the card's loads,\n");
   printf("                 the others checked off\n");
-  printf("  --loopback     UART loopback through the pins (loopback card), one tile at a time\n");
+  printf("  --loopback     UART loopback through the pins (loopback card), one tile at a time,\n");
+  printf("                 then all the masked tiles at once\n");
   printf("  --atc_outputs  each tile's SYNC, TRIG through the ATC test card to its PISO\n");
   printf("  --lemo_inputs  TRIG (LEMO A) and PPS (LEMO B) rates (a 1 kHz TTL on both)\n");
   printf("  --ana_mon      each tile's CLK on its analog monitor (ATC test card), into the ADC\n");
@@ -106,7 +107,11 @@ typedef struct {
 static void run_read_only(const hwcheck_opts_t * o)   { read_only(o->no_iic); }
 static void run_power(const hwcheck_opts_t * o)       { iic_check_power(o->tile_mask); }
 static void run_loopback(const hwcheck_opts_t * o)    {
-  rxtx_check_loopback(o->tile_mask, o->ber_bits);
+  init_rxtx();
+  hwcheck_set_tile_mask(o->tile_mask);
+  if (o->ber_bits)
+    rxtx_set_loopback_packets((o->ber_bits + 4*64 - 1) / (4*64));   // 4 UARTs x 64 bits per packet
+  hwcheck_loopback();
 }
 static void run_atc_outputs(const hwcheck_opts_t * o) { atc_check_outputs(o->tile_mask); }
 static void run_lemo_inputs(const hwcheck_opts_t * o) { (void) o;  atc_check_lemo_inputs(); }

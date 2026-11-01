@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "hw_access.h"
 #include "dma.h"
@@ -6,8 +8,27 @@
 #include "asic.h"
 #include "rxtx.h"
 
-hw_val_t tx_mask_b = 0xFF;
-hw_val_t tx_mask_a = 0xFFFFFFFF;
+#define ALL_UARTS 0xFFFFFFFFFFULL   // UARTs 1-40
+
+// RX UART config fields:
+#define RX_CONFIG_PERIOD_SHIFT 16          // [23:16] clocks per bit
+#define RX_CONFIG_PERIOD_MASK  0x00FF0000
+#define RX_CONFIG_FLAGS_SHIFT  14          // [15:14] bit 14: start a byte despite vote dissent
+#define RX_CONFIG_FLAGS_MASK   0x0000C000
+#define RX_CONFIG_MODE_SHIFT   12          // [13:12] sampling mode
+#define RX_CONFIG_MODE_MASK    0x00003000
+#define RX_CONFIG_INPUT_SHIFT  8           // [11:8]  input select
+#define RX_CONFIG_INPUT_MASK   0x00000F00
+#define RX_CONFIG_PHASE_SHIFT  0           // [7:0]   sample point
+#define RX_CONFIG_PHASE_MASK   0x000000FF
+
+// RX buffer config fields, 0 = no condition:
+#define RX_BUFFER_MAX_WORDS_SHIFT 16          // [31:16] max 192-bit words per DMA packet
+#define RX_BUFFER_MAX_WORDS_MASK  0xFFFF0000
+#define RX_BUFFER_TIMEOUT_SHIFT   0           // [15:0]  packet timeout, in units of 256 clocks
+#define RX_BUFFER_TIMEOUT_MASK    0x0000FFFF
+
+static uint64_t G_UART_MASK = ALL_UARTS;
 
 static unsigned tx_counter = 0;
 static unsigned tx_ring_size = 0;
@@ -122,8 +143,8 @@ void single_tx(void){
 
   hw_ptr_t tx_buf = dma_get_buffer(nxta);
 
-  tx_buf[0]= tx_mask_a;
-  tx_buf[1]= tx_mask_b;
+  tx_buf[0]= (hw_u32_t) G_UART_MASK;
+  tx_buf[1]= (hw_u32_t) (G_UART_MASK >> 32);
 
   for (int i=0; i<TX_PAYLOAD_U32_WORDS; i++)
     tx_buf[i+TX_HEADER_U32_WORDS] = 0xB000F000 + i + (tx_counter<<16);
@@ -161,8 +182,8 @@ void batch_tx(void){
     printf("INFO:  working on buffer %d at HW addr 0x%08X \r\n", count, (unsigned int) nxta);
     hw_ptr_t tx_buf = dma_get_buffer(nxta);
 
-    tx_buf[0]= tx_mask_a;
-    tx_buf[1]= tx_mask_b;
+    tx_buf[0]= (hw_u32_t) G_UART_MASK;
+    tx_buf[1]= (hw_u32_t) (G_UART_MASK >> 32);
 
     for (int i=0; i<TX_PAYLOAD_U32_WORDS; i++)
       tx_buf[i+TX_HEADER_U32_WORDS] = 0xB000F000 + i + (tx_counter<<16);
@@ -255,7 +276,7 @@ void toggle_tx_config(void){
   }
 }
 
-void rx_set_input(unsigned chan, unsigned input){
+static void rx_set_input(unsigned chan, unsigned input){
   if (chan < 40){
     hw_u32_t cfg = axil_read_register(SCOPE_RX+(chan<<8)+C_ADDR_RX_UART_CONFIG);
     cfg &= ~RX_CONFIG_INPUT_MASK;
@@ -264,8 +285,36 @@ void rx_set_input(unsigned chan, unsigned input){
   }
 }
 
+hw_u32_t rx_config(unsigned period, unsigned flags, unsigned mode, unsigned input, unsigned phase){
+  return ((period << RX_CONFIG_PERIOD_SHIFT) & RX_CONFIG_PERIOD_MASK)
+       | ((flags  << RX_CONFIG_FLAGS_SHIFT)  & RX_CONFIG_FLAGS_MASK)
+       | ((mode   << RX_CONFIG_MODE_SHIFT)   & RX_CONFIG_MODE_MASK)
+       | ((input  << RX_CONFIG_INPUT_SHIFT)  & RX_CONFIG_INPUT_MASK)
+       | ((phase  << RX_CONFIG_PHASE_SHIFT)  & RX_CONFIG_PHASE_MASK);
+}
+
+hw_u32_t rx_buffer_config(unsigned max_words, unsigned timeout){
+  return ((max_words << RX_BUFFER_MAX_WORDS_SHIFT) & RX_BUFFER_MAX_WORDS_MASK)
+       | ((timeout   << RX_BUFFER_TIMEOUT_SHIFT)   & RX_BUFFER_TIMEOUT_MASK);
+}
+
 void rx_set_config_all(hw_u32_t config){
   axil_write_register(SCOPE_RX+UART_BROADCAST+C_ADDR_RX_UART_CONFIG, config);
+}
+
+void rx_set_config(unsigned chan, hw_u32_t config){
+  if (chan < 40)
+    axil_write_register(SCOPE_RX+(chan<<8)+C_ADDR_RX_UART_CONFIG, config);
+}
+
+void rx_set_config_options(unsigned chan, unsigned period, unsigned flags, unsigned mode,
+                           unsigned input, unsigned phase){
+  rx_set_config(chan, rx_config(period, flags, mode, input, phase));
+}
+
+void rx_set_config_options_all(unsigned period, unsigned flags, unsigned mode, unsigned input,
+                               unsigned phase){
+  rx_set_config_all(rx_config(period, flags, mode, input, phase));
 }
 
 hw_val_t rx_get_buffer_config(void){
@@ -441,27 +490,19 @@ void read_tx_look(void){
   }
 }
 
-void toggle_tx_mask(void){
-  static int mode = 0;
-  mode = (mode + 1) % 4;
-  switch(mode){
-  case 1:
-    tx_mask_b = 0x0;
-    tx_mask_a = 0x0;
-    break;
-  case 2:
-    tx_mask_b = 0x0;
-    tx_mask_a = 0x1;
-    break;
-  case 3:
-    tx_mask_b = 0x0;
-    tx_mask_a = 0xFFFFFFFF;
-    break;
-  default:
-    tx_mask_b = 0xFF;
-    tx_mask_a = 0xFFFFFFFF;
-  }
-  printf("TX mask:  0x%08x %08x \r\n", (unsigned int) tx_mask_b, (unsigned int) tx_mask_a);
+uint64_t rxtx_uart_mask(void){
+  return G_UART_MASK;
+}
+
+void rxtx_set_uart_mask(uint64_t mask){
+  G_UART_MASK = mask & ALL_UARTS;
+}
+
+uint64_t rxtx_tile_uarts(hw_u32_t tile_mask){
+  uint64_t mask = 0;
+  for (unsigned t = 0; t < 10; t++)
+    if ((tile_mask >> t) & 1) mask |= 0xFULL << (4*t);
+  return mask;
 }
 
 void zero_rxtx_counts(void){
@@ -471,106 +512,99 @@ void zero_rxtx_counts(void){
 
 
 //
-// Benchmarks:
+// Loopback test:
 //
 
-void benchmark_tx(void){
-  // assuming 40 uarts
-  const unsigned packets    = 10000; // DMA packets to send
-  const unsigned uarts      = 40;
-  const unsigned batch_size = 100;
-
-  unsigned tx_sent = 0;
-
-  init_rxtx_descriptor_ring_mode(128);
-
-  start_hw_timer();
-  while (tx_sent < packets) {
-    unsigned batch_count = 0;
-    hw_addr_t nxta = 0;
-    while((batch_count < batch_size) && (dma_next_available_tx_bd(&nxta))){
-      //printf("INFO:  working on buffer %d at HW addr 0x%08X \r\n", batch_count, nxta);
-      hw_ptr_t tx_buf = dma_get_buffer(nxta);
-
-      tx_buf[0]= tx_mask_a;
-      tx_buf[1]= tx_mask_b;
-
-      for (int i=0; i<TX_PAYLOAD_U32_WORDS; i++)
-	tx_buf[i+TX_HEADER_U32_WORDS] = rand();
-
-      HW_FLUSH_DCACHE(tx_buf, TX_PACKET_BYTES);
-
-      dma_add_tx_bd(nxta);
-      batch_count++;
-    }
-    if (batch_count > 0){
-      tx_sent += batch_count;
-      dma_tx_batch();
-    }
-  }
-  dma_wait_tx_idle(100000);
-  stop_hw_timer();
-
-  unsigned elapsed_us = hw_timer_elapsed_us();
-
-  printf("INFO:  elapsed microseconds:    %d (0x%x)\r\n", elapsed_us, (unsigned int) elapsed_us);
-  printf("INFO:  tx payloads per packet:  %d\r\n", uarts);
-  printf("INFO:  packets:                 %d\r\n", packets);
-
-  if (elapsed_us == 0)
-    return;
-
-  unsigned a = 1000 * uarts * packets / elapsed_us;
-  unsigned m = uarts*10000/66;
-  unsigned p = uarts*10000/67;
-
-  printf("INFO:  achieved throughput:     %d tx uart packets per ms\r\n", a);
-  printf("INFO:  maximum tx rate:         %d tx uart packets (64-bit+2 @ 10 MHz) per ms\r\n", m);
-  printf("INFO:  practical max:           %d tx uart packets (64-bit+3 @ 10 MHz) per ms\r\n", p);
+// expected word k on a UART:  splitmix64 of (seed, uart, k)
+static uint64_t loopback_word(hw_u32_t seed, unsigned uart, unsigned k){
+  uint64_t z = ((uint64_t) seed << 32) ^ ((uint64_t) uart << 24) ^ (uint64_t) k;
+  z += 0x9E3779B97F4A7C15ULL;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+  return z ^ (z >> 31);
 }
 
-void benchmark_rxtx_loopback(void){
+// time limits:
+#define LOOPBACK_DRAIN_US       1000000
+#define LOOPBACK_BASE_US        1000000
+#define LOOPBACK_PACKET_NS      264000     // 10 x 26.4 us
 
-  const unsigned tx_packets  = 10000; // DMA packets to send
-  const unsigned uarts       = 40;    // *** assuming all 40 uarts enabled ***
-  const unsigned uart_bytes  = 24;    // 192-bits per uart channel
-  const unsigned batch_size  = 100;
-  const unsigned rx_expected = uarts * uart_bytes * tx_packets;
+static hw_u32_t loopback_elapsed_us(void){
+  stop_hw_timer();
+  return hw_timer_elapsed_us();
+}
 
-  const unsigned timeout = 10000;
-  unsigned rx_timeout = timeout;
+void rxtx_loopback(uint64_t uart_mask, unsigned packets,
+                   bool ber_test, hw_u32_t seed, rxtx_check_t * r){
+  const unsigned uarts      = 40;
+  const unsigned batch_size = 100;
+  const unsigned timeout    = 10000;
   unsigned tx_timeout = timeout;
-  unsigned tx_sent  = 0;
-  unsigned rx_rcvd  = 0;
-  unsigned rx_bytes = 0;
+  unsigned rx_timeout = timeout;
+  unsigned tx_k = 0;            // words sent so far on each UART
+  unsigned rx_k[40];            // words received so far on each UART
+  hw_val_t chan_id[40];         // channel id in the RX word header, per UART
 
-  init_rxtx_descriptor_ring_mode(128);
+  memset(r, 0, sizeof(*r));
+  uart_mask &= ALL_UARTS;
+  for (unsigned u=0; u<uarts; u++){
+    rx_uart_status_t us;
+    get_rx_uart_status(u, &us);
+    chan_id[u] = us.chan & 0xFFFF;
+    rx_k[u] = 0;
+  }
 
+  // discard words left over from earlier activity (they would shift the expected sequence):
   start_hw_timer();
-  while (tx_timeout && rx_timeout && (rx_bytes < rx_expected)){
-    if (tx_sent < tx_packets) {
+  for (unsigned idle = 0; idle < 100000; idle++){
+    if (loopback_elapsed_us() > LOOPBACK_DRAIN_US){
+      r->timeout = 1;
+      return;
+    }
+    hw_addr_t nxta = 0;
+    while (dma_next_available_rx_bd(&nxta)){
+      unsigned xbytes = dma_poll_bd_transferred(nxta);
+      if (xbytes >= RX_TRAILER_BYTES)
+        r->stale_words += (xbytes - RX_TRAILER_BYTES) / RX_WORD_BYTES;
+      dma_add_rx_bd(nxta);
+      dma_rx_batch();
+      idle = 0;
+    }
+  }
+
+  const unsigned nmasked = __builtin_popcountll(uart_mask);
+  const unsigned words_expected = nmasked * packets;
+  const hw_u32_t limit_us = LOOPBACK_BASE_US + (hw_u32_t) (((uint64_t) packets * LOOPBACK_PACKET_NS) / 1000);
+  start_hw_timer();
+  while (tx_timeout && rx_timeout && (r->words_rcvd < words_expected)){
+    if (loopback_elapsed_us() > limit_us){
+      r->timeout = 2;
+      break;
+    }
+    if (r->tx_packets < packets) {
       tx_timeout--;
       unsigned batch_count = 0;
       hw_addr_t nxta = 0;
-      while((batch_count < batch_size) && (batch_count < (tx_packets-tx_sent)) && (dma_next_available_tx_bd(&nxta))){
-	//printf("INFO:  working on buffer %d at HW addr 0x%08X \r\n", batch_count, nxta);
-	hw_ptr_t tx_buf = dma_get_buffer(nxta);
-
-	tx_buf[0]= tx_mask_a;
-	tx_buf[1]= tx_mask_b;
-
-	//for (int i=0; i<TX_PAYLOAD_U32_WORDS; i++)
-	//  tx_buf[i+TX_HEADER_U32_WORDS] = rand();
-
-	HW_FLUSH_DCACHE(tx_buf, TX_PACKET_BYTES);
-
-	dma_add_tx_bd(nxta);
-	batch_count++;
+      while((batch_count < batch_size) && (batch_count < (packets - r->tx_packets)) && (dma_next_available_tx_bd(&nxta))){
+        hw_ptr_t tx_buf = dma_get_buffer(nxta);
+        tx_buf[0] = (hw_u32_t) uart_mask;           // UARTs 1-32
+        tx_buf[1] = (hw_u32_t) (uart_mask >> 32);   // UARTs 33-40
+        if (ber_test){
+          for (unsigned u=0; u<uarts; u++){
+            uint64_t w = loopback_word(seed, u, tx_k);
+            tx_buf[TX_HEADER_U32_WORDS + 2*u]     = (hw_u32_t) w;
+            tx_buf[TX_HEADER_U32_WORDS + 2*u + 1] = (hw_u32_t) (w >> 32);
+          }
+        }
+        tx_k++;
+        HW_FLUSH_DCACHE(tx_buf, TX_PACKET_BYTES);
+        dma_add_tx_bd(nxta);
+        batch_count++;
       }
       if (batch_count > 0){
-	tx_timeout = timeout;
-	tx_sent += batch_count;
-	dma_tx_batch();
+        tx_timeout = timeout;
+        r->tx_packets += batch_count;
+        dma_tx_batch();
       }
     }
     {
@@ -578,49 +612,48 @@ void benchmark_rxtx_loopback(void){
       unsigned batch_count = 0;
       hw_addr_t nxta = 0;
       while((batch_count < batch_size) && (dma_next_available_rx_bd(&nxta))){
-	unsigned xbytes = dma_poll_bd_transferred(nxta);
-	if (xbytes > RX_TRAILER_BYTES){
-	  rx_bytes += xbytes - RX_TRAILER_BYTES;
-	} else {
-	  printf("ERROR: invalid RX packet of size %d bytes found \r\n", xbytes);
-	  return;
-	}
-	batch_count++;
-	dma_add_rx_bd(nxta);
+        unsigned xbytes = dma_poll_bd_transferred(nxta);
+        if ((xbytes < RX_TRAILER_BYTES) || ((xbytes - RX_TRAILER_BYTES) % RX_WORD_BYTES)){
+          r->bad_packets++;
+        } else {
+          hw_ptr_t rx_buf = dma_get_buffer(nxta);
+          HW_INVALIDATE_DCACHE(rx_buf, xbytes);
+          unsigned nwords = (xbytes - RX_TRAILER_BYTES) / RX_WORD_BYTES;
+          for (unsigned i=0; i<nwords; i++){
+            hw_ptr_t word = rx_buf + i * (RX_WORD_BYTES/4);
+            hw_val_t chan = (word[0] >> 16) & 0xFFFF;   // header: [7:0] type, [15:8] pacman id, [31:16] channel
+            unsigned u = 0;
+            while ((u < uarts) && (chan_id[u] != chan)) u++;
+            if (u == uarts){
+              r->other_words++;
+              continue;
+            }
+            r->rcvd[u]++;
+            if (!((uart_mask >> u) & 1)){
+              r->stray_words++;
+              continue;
+            }
+            r->words_rcvd++;
+            if (ber_test){
+              uint64_t data = ((uint64_t) word[5] << 32) | word[4];   // fragments: header, timestamp, data
+              uint64_t diff = data ^ loopback_word(seed, u, rx_k[u]++);
+              if (diff){
+                r->words_bad++;
+                r->bit_errors += __builtin_popcountll(diff);
+              }
+            }
+          }
+        }
+        batch_count++;
+        dma_add_rx_bd(nxta);
       }
       if (batch_count > 0){
-	rx_timeout = timeout;
-	rx_rcvd += batch_count;
-	dma_rx_batch();
+        rx_timeout = timeout;
+        dma_rx_batch();
       }
     }
   }
-  stop_hw_timer();
-
-  printf("INFO:  tx_sent: %d rx_rcvd: %d rx_bytes %d expected: %d \r\n", tx_sent, rx_rcvd, rx_bytes, rx_expected);
-
-  if ((tx_timeout==0) || (rx_timeout==0)){
-    printf("ERROR: a timeout occurred during RX/TX benchmark \r\n");
-    printf("INFO:  rx_timeout:  %d tx_timeout: %d \r\n", rx_timeout, tx_timeout);
-    return;
-  }
-
-  unsigned elapsed_us = hw_timer_elapsed_us();
-
-  printf("INFO:  elapsed microseconds:    %d (0x%x)\r\n", elapsed_us, elapsed_us);
-  printf("INFO:  tx payloads per packet:  %d\r\n", uarts);
-  printf("INFO:  packets:                 %d\r\n", tx_packets);
-
-  if (elapsed_us == 0)
-    return;
-
-  unsigned a = 1000 * uarts * tx_packets / elapsed_us;
-  unsigned m = uarts*10000/66;
-  unsigned p = uarts*10000/67;
-
-  printf("INFO:  achieved throughput:     %d tx uart packets per ms\r\n", a);
-  printf("INFO:  maximum tx rate:         %d tx uart packets (64-bit+2 @ 10 MHz) per ms\r\n", m);
-  printf("INFO:  practical max:           %d tx uart packets (64-bit+3 @ 10 MHz) per ms\r\n", p);
-
-
+  r->elapsed_us = loopback_elapsed_us();
+  r->words_sent = nmasked * r->tx_packets;
+  r->tx_timeout = (tx_timeout == 0);
 }

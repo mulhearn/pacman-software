@@ -287,14 +287,14 @@ static void words_for(unsigned k, uint64_t w[NUART]) { for (unsigned u = 0; u < 
 #define PACMAN_ID 0x5A
 static void rx_loopback(uint64_t mask){
   for (unsigned u = 0; u < NUART; u++){
-    wr(RX_UART(u, C_ADDR_RX_UART_CONFIG), ((mask >> u) & 1) ? RX_TEST_LOOPBACK
-                                                            : RX_CONFIG(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 4));
+    hw_val_t input = ((mask >> u) & 1) ? RX_INPUT_LOOPBACK : RX_INPUT_OFF;
+    wr(RX_UART(u, C_ADDR_RX_UART_CONFIG), rx_config(0x0A, 0, RX_MODE_EDGE, input, 4));
     wr(RX_UART(u, C_ADDR_RX_UART_CHAN), u + 1);
   }
   wr(RX_COMMON + C_ADDR_RX_PACMAN, PACMAN_ID);
   wr(RX_COMMON + C_ADDR_RX_WORD_TYPE_LUT, 0x44444444);
   wr(RX_COMMON + C_ADDR_RX_BUFFER_ENABLES, 0);
-  wr(RX_COMMON + C_ADDR_RX_BUFFER_CONFIG, RX_BUFFER_CONFIG(0, 1));
+  wr(RX_COMMON + C_ADDR_RX_BUFFER_CONFIG, rx_buffer_config(0, 1));
 }
 
 static hw_val_t data_header(unsigned type, unsigned u) { return ((u + 1) << 16) | (PACMAN_ID << 8) | type; }
@@ -425,9 +425,9 @@ static void check_bus_writes(void){
   check_eq(rd(GLB(C_ADDR_GLOBAL_SCRATCH_A)), a, "SCRATCH_A unchanged by undefined and other-scope writes");
 
   req("REG-2.3");
-  wr(SCOPE_RX + UART_BROADCAST + C_ADDR_RX_UART_CONFIG, RX_CONFIG(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 5));
+  wr(SCOPE_RX + UART_BROADCAST + C_ADDR_RX_UART_CONFIG, rx_config(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 5));
   for (unsigned u = 0; u < NUART; u++)
-    check_eq(rd(RX_UART(u, C_ADDR_RX_UART_CONFIG)), RX_CONFIG(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 5),
+    check_eq(rd(RX_UART(u, C_ADDR_RX_UART_CONFIG)), rx_config(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 5),
              "RX broadcast UART_CONFIG");
   hw_val_t tx0 = rd(TX_UART(0, C_ADDR_TX_UART_CONFIG));
   wr(SCOPE_TX + UART_BROADCAST + C_ADDR_TX_UART_CONFIG, 0x00000005);
@@ -561,7 +561,10 @@ static void check_bits(void){
   rx_loopback(0xFFFFFFFFFFULL);
   drain();
   rxtx_check_t r;
-  rxtx_loopback_run(1000, 7, RXTX_ALL_UARTS, &r);
+  hw_val_t buffer_config = rx_get_buffer_config();
+  rx_set_buffer_config(RX_BUFFER_CONFIG_DAQ);
+  rxtx_loopback(rxtx_tile_uarts(0x3FF), 1000, true, 7, &r);
+  rx_set_buffer_config(buffer_config);
   check(r.words_rcvd == 40000 && r.bit_errors == 0, "random loopback:  %u of 40000 words, %u bit errors",
         r.words_rcvd, r.bit_errors);
 
@@ -626,8 +629,8 @@ static void check_input_select(void){
   uint64_t w[NUART];
   const uint64_t mask = (1ULL << 30) | (1ULL << 31) | (1ULL << 32);
   rx_loopback(mask);
-  wr(RX_UART(31, C_ADDR_RX_UART_CONFIG), RX_CONFIG(0x0A, 0, RX_MODE_OFF, RX_INPUT_LOOPBACK, 4));
-  wr(RX_UART(32, C_ADDR_RX_UART_CONFIG), RX_CONFIG(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 4));
+  wr(RX_UART(31, C_ADDR_RX_UART_CONFIG), rx_config(0x0A, 0, RX_MODE_OFF, RX_INPUT_LOOPBACK, 4));
+  wr(RX_UART(32, C_ADDR_RX_UART_CONFIG), rx_config(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 4));
   drain();
   words_for(3, w);
   send_packet(mask, w);
@@ -647,7 +650,7 @@ static void check_packets(void){
   uint64_t w[NUART];
   const uint64_t mask = 0x7ULL << 33;      // UARTs 33-35
   rx_loopback(mask);
-  wr(RX_COMMON + C_ADDR_RX_BUFFER_CONFIG, RX_BUFFER_CONFIG(2, 1));
+  wr(RX_COMMON + C_ADDR_RX_BUFFER_CONFIG, rx_buffer_config(2, 1));
   drain();
   words_for(4, w);
   send_packet(mask, w);
@@ -666,7 +669,7 @@ static void check_packets(void){
   static const unsigned TIMEOUTS[] = {8, 2};
   for (unsigned t = 0; t < 2; t++){
     unsigned timeout = TIMEOUTS[t];
-    wr(RX_COMMON + C_ADDR_RX_BUFFER_CONFIG, RX_BUFFER_CONFIG(0, timeout));
+    wr(RX_COMMON + C_ADDR_RX_BUFFER_CONFIG, rx_buffer_config(0, timeout));
     drain();
     words_for(5, w); queue_packet(1ULL << 36, w);
     words_for(6, w); queue_packet(1ULL << 36, w);
@@ -676,7 +679,7 @@ static void check_packets(void){
     check(G_NW == 2 && G_NP == want, "timeout %u:  %u words in %u packets (expected 2 in %u;  %u UART periods apart)",
           timeout, G_NW, G_NP, want, G_NW == 2 ? (unsigned) (G_W[1].ts - G_W[0].ts) : 0);
   }
-  wr(RX_COMMON + C_ADDR_RX_BUFFER_CONFIG, RX_BUFFER_CONFIG(0, 1));
+  wr(RX_COMMON + C_ADDR_RX_BUFFER_CONFIG, rx_buffer_config(0, 1));
 }
 
 // ------------------------------------------------------------------------------------------------------------
@@ -687,7 +690,7 @@ static void check_pattern(void){
   wr(RX_COMMON + C_ADDR_RX_PATTERN_LOWER, 0xDEADBEEF);
   wr(RX_COMMON + C_ADDR_RX_PATTERN_UPPER, 0xC0FFEE00);
   wr(RX_COMMON + C_ADDR_RX_PATTERN_DELAY, 1000);          // 1000 idle bits:  a word every ~107 us
-  wr(RX_UART(37, C_ADDR_RX_UART_CONFIG), RX_TEST_PATTERN);
+  wr(RX_UART(37, C_ADDR_RX_UART_CONFIG), rx_config(0x0A, 0, RX_MODE_EDGE, RX_INPUT_PATTERN, 4));
   hw_val_t starts0 = rd(RX_COMMON + C_ADDR_RX_PATTERN_STARTS);
   drain();
   wr(RX_COMMON + C_ADDR_RX_PATTERN_CONFIG, 0x00000004);   // phase 4 first, then on (pattern.vhd start-up)
@@ -701,7 +704,7 @@ static void check_pattern(void){
   wr(RX_COMMON + C_ADDR_RX_PATTERN_CONFIG, 0x00000000);
   collect(1000, 500);
   hw_val_t starts1 = rd(RX_COMMON + C_ADDR_RX_PATTERN_STARTS);
-  wr(RX_UART(37, C_ADDR_RX_UART_CONFIG), RX_CONFIG(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 4));
+  wr(RX_UART(37, C_ADDR_RX_UART_CONFIG), rx_config(0x0A, 0, RX_MODE_EDGE, RX_INPUT_OFF, 4));
 
   req("RX-5.1");
   unsigned good = 0;

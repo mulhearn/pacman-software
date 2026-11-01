@@ -23,6 +23,7 @@
 #include "iic_menu.h"
 #include "asic_menu.h"
 #include "atc_menu.h"
+#include "adc_menu.h"
 #include "hwcheck_menu.h"
 
 #define EMAC_DEVICE_ID      XPAR_XEMACPS_0_DEVICE_ID
@@ -107,187 +108,39 @@ void toggle_dcache(){
   }
 }
 
-void blink_leds(){
-  blink_red_led();
-  blink_pacman_leds();
-}
 
-void rxtx_menu(){
-  printf("RX/TX Menu: \r\n");
-
+void main_menu(){
   while(1){
-    printf("choose an option:\r\n");
-    printf("(0) exit RX/TX Menu \r\n");
-    printf("(1) read tx status (2) read rx status (3) read tx look (4) read rx look\r\n");
-    printf("(5) toggle tx UART configs (6) toggle rx UART configs (7) zero counts\r\n");
-    printf("(8) toggle rx buffer config (9) toggle rx enables (a) toggle test patterns (b) toggle tx mask \r\n");
-    printf("...\r\n");
-    printf("(e) init descriptor ring mode (f) show BDs (g) show head/tail (h) clear IOC flags \r\n");
-    printf("(i) single TX (j) single RX (k) batch TX (l) batch RX \r\n");
-    printf("(m) show TX buffer (n) show RX buffer (o) show RX transferred \r\n");
-    printf("...\r\n");
-    printf("(t) reset TX DMA (u) TX DMA status (v) reset RX DMA (w) RX DMA status (x) long DMA status \r\n");
-    printf("(y) benchmark TX (z) benchmark RX/TX loopback \r\n");
-    unsigned char c=inbyte();
-    printf("pressed:  %c\r\n", c);
-    switch(c){
-    case '0':
+    printf("MAIN MENU:  choose an option:\r\n");
+    printf("(l) blink LEDs (g) read global status (s) toggle scratch (n) toggle enables \r\n");
+    printf("(t) toggle dcache (m) read MAC from CPLD (k) toggle CPLD config \r\n");
+    printf("(a) I2C menu (b) RX/TX menu (c) ATC menu (d) ADC menu \r\n");
+    printf("(e) single ASIC menu (f) hardware check menu \r\n");
+    int input = input_choice();
+    if (input == INPUT_END)
       return;
-    case '1':
-      read_tx_status();
-      break;
-    case '2':
-      read_rx_status();
-      break;
-    case '3':
-      read_tx_look();
-      break;
-    case '4':
-      read_rx_look();
-      break;
-    case '5':
-      toggle_tx_config();
-      break;
-    case '6':
-      toggle_rx_config();
-      break;
-    case '7':
-      zero_rxtx_counts();
-      break;
-    case '8':
-      toggle_rx_buffer_config();
-      break;
-    case '9':
-      toggle_rx_buffer_enables();
-      break;
-    case 'a':
-      toggle_rx_test_patterns();
-      break;
-    case 'b':
-      toggle_tx_mask();
-      break;
-    case 'e':
-      init_rxtx_descriptor_ring_mode(8);
-      break;
-    case 'f':
-      show_rxtx_bds();
-      break;
-    case 'g':
-      show_rxtx_head_tail();
-      break;
-    case 'h':
-      clear_rxtx_ioc();
-      break;
-    case 'i':
-      single_tx();
-      break;
-    case 'j':
-      single_rx();
-      break;
-    case 'k':
-      batch_tx();
-      break;
+    printf("INFO: selected %c\r\n", input);
+
+    switch(input){
     case 'l':
-      batch_rx();
-      break;
-    case 'm':
-      show_tx_buffer();
-      break;
-    case 'n':
-      show_rx_buffer();
-      break;
-    case 'o':
-      show_rx_transferred();
-      break;
-    case 't':
-      dma_reset_tx(DMA_TIMEOUT);
-      break;
-    case 'u':
-      dma_show_tx_status();
-      break;
-    case 'v':
-      dma_reset_rx(DMA_TIMEOUT);
-      break;
-    case 'w':
-      dma_show_rx_status();
-      break;
-    case 'x':
-      dma_show_long_status();
-      break;
-    case 'y':
-      benchmark_tx();
-      break;
-    case 'z':
-      benchmark_rxtx_loopback();
-      break;
-    default:
-      printf("invalid selection...\r\n");
-    }
-  }
-}
-
-
-void adc_menu(){
-}
-
-
-int main(){
-  printf("Menu-Driver Demonstration Driver For PACMAN\r\n");
-  printf("Sanity number:  1\r\n");
-  printf("Random Max:  0x%x Random Number:  0x%x \r\n", RAND_MAX, rand());
-
-  int status = 0;
-  axil_platform_init();
-  print_global_version();
-  iic_platform_init();
-  // I2C for the hardware version the firmware was built for (the I2C menu can override):
-  global_status_t gs;
-  get_global_status(&gs);
-  iic_set_hw_version(gs.hardware_major, gs.hardware_minor, gs.hardware_patch);
-  gpio_platform_init();
-
-  mdio_init();
-  init_rxtx();
-  init_led();
-  if (status != XST_SUCCESS) {
-    printf("Hardware initialization has FAILED.\r\n");
-    return 0;
-  }
-
-  printf("Setting up DMA circular buffers (n=8):\r\n");
-  init_rxtx_descriptor_ring_mode(8);
-
-  printf("Setting ATC default configuration:\r\n");
-  set_atc_default_config();
-
-  while(1){
-    printf("choose an option:\r\n");
-    printf("(1) blink LEDs (2) read global status (3) toggle scratch (4) toggle enables (5) toggle dcache \r\n");
-    printf("(6) read MAC From CPLD (7) toggle CPLD config \r\n");
-    printf("(a) I2C menu (b) RX/TX menu (c) ATC menu (d) ADC menu (e) single ASIC menu\r\n");
-    printf("(f) hardware check menu\r\n");
-    unsigned char c=inbyte();
-    printf("pressed:  %c\r\n", c);
-    switch(c){
-    case '1':
       blink_leds();
       break;
-    case '2':
+    case 'g':
       read_global_status();
       break;
-    case '3':
+    case 's':
       toggle_global_scratch();
       break;
-    case '4':
+    case 'n':
       toggle_global_enables();
       break;
-    case '5':
+    case 't':
       toggle_dcache();
       break;
-    case '6':
+    case 'm':
       read_mac_from_cpld();
       break;
-    case '7':
+    case 'k':
       toggle_cpld();
       break;
     case 'a':
@@ -312,6 +165,38 @@ int main(){
       printf("invalid selection...\r\n");
     }
   }
+}
+
+int main(){
+  printf("Menu-Driver Demonstration Driver For PACMAN\r\n");
+  printf("Sanity number:  1\r\n");
+  printf("Random Max:  0x%x Random Number:  0x%x \r\n", RAND_MAX, rand());
+
+  int status = 0;
+  axil_platform_init();
+  print_global_version();
+  iic_platform_init();
+  // I2C for the hardware version the firmware was built for (the I2C menu can override):
+  global_status_t gs;
+  get_global_status(&gs);
+  iic_set_hw_version(gs.hardware_major, gs.hardware_minor, gs.hardware_patch);
+  gpio_platform_init();
+
+  mdio_init();
+  init_rxtx();
+  init_led();
+  if (status != XST_SUCCESS) {
+    printf("Hardware initialization has FAILED.\r\n");
+    return 0;
+  }
+
+  printf("Setting up DMA circular buffers (n=%d):\r\n", RXTX_RING_BDS);
+  init_rxtx_descriptor_ring_mode(RXTX_RING_BDS);
+
+  printf("Setting ATC default configuration:\r\n");
+  set_atc_default_config();
+
+  main_menu();
   return 0;
 }
 

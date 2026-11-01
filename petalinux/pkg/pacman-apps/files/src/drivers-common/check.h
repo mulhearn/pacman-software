@@ -23,7 +23,7 @@ void check_clear_counts();
 // The counts since the last clear.
 void check_counts(int * npass, int * nfail, int * nskip);
 
-// Pause for the operator:  print prompt, wait for Enter.
+// Pause for the operator:  print prompt, wait for Enter (or the end of input).
 void check_pause(const char * prompt);
 
 #ifdef __cplusplus

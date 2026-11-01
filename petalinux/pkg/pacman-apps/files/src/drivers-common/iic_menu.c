@@ -349,9 +349,12 @@ void iic_menu(){
   printf("I2C menu:  \r\n");
   while(1){
     printf("choose an option:\r\n");
-    printf("(x) Exit I2C menu (s) I2C status (r) reset I2C (v) toggle I2C HW version (c) check I2C (p) toggle power (m) monitor power \r\n");
+    printf("(x) Exit I2C menu (s) I2C status (r) reset I2C (v) toggle I2C HW version \r\n");
+    printf("(c) check I2C (e) toggle enables (p) toggle power (m) monitor power (w) IV curves \r\n");
     printf("(k) check power (a) check SMA (z) stress I2C \r\n");
-    char input = input_choice();
+    int input = input_choice();
+    if (input == INPUT_END)
+      return;
     printf("INFO: selected %c\r\n", input);
 
     switch(input){
@@ -380,6 +383,15 @@ void iic_menu(){
       break;
     case 'm':
       iic_monitor_power();
+      break;
+    case 'c':
+      check_iic();
+      break;
+    case 'e':
+      toggle_global_enables();
+      break;
+    case 'w':
+      iic_record_iv_curves();
       break;
     default:
       printf("invalid selection...\r\n");
