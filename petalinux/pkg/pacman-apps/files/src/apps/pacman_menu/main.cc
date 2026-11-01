@@ -24,6 +24,7 @@
 #include "atc_menu.h"
 #include "iic_menu.h"
 #include "adc_menu.h"
+#include "hwcheck_menu.h"
 
 // *** LED ***
 
@@ -283,57 +284,12 @@ void rxtx_menu(){
   return;
 }
 
-void atc_menu(){
-  printf("ASIC timing and control (ATC) signal menu:  \r\n");
-  while(1){
-    printf("choose an option:\r\n");
-    printf("(0) Exit timing menu\r\n");
-    printf("(1) read ATC registers (2) read ATC counts (3) toggle ATC destinations \r\n");
-    printf("(4) poke C (5) poke D (6) toggle G/H polarity (7) toggle counters \r\n");
-
-    int input;
-    if (scanf("%d", &input) != 1){
-      printf("ERROR: invalid input.\r\n");
-      continue;
-    }
-    printf("INFO: selected %d\r\n", input);
-
-    switch(input){
-    case 0:
-      return;
-    case 1:
-      read_atc_registers();
-      break;
-    case 2:
-      read_atc_counts();
-      break;
-    case 3:
-      toggle_atc_destinations();
-      break;
-    case 4:
-      send_poke_c(0x3FF);
-      break;
-    case 5:
-      send_poke_d(0x3FF);
-      break;
-    case 6:
-      toggle_atc_polarity();
-      break;
-    case 7:
-      toggle_atc_run();
-      break;
-    default:
-      printf("invalid selection...\r\n");
-    }
-  }
-}
-
 void main_menu(){
   while(1){
     printf("MAIN MENU:  choose an option:\r\n");
     printf("(1) blink LEDs (2) global registers (3) toggle scratch registers\r\n");
     printf("(4) power menu (5) I2C menu (6) RX/TX menu (7) ATC menu (8) ADC menu \r\n");
-    printf("(9) ASIC menu (10) ATC menu \r\n");
+    printf("(9) ASIC menu (10) ATC menu (11) hardware check menu \r\n");
     int input;
     if (scanf("%d", &input) != 1){
       printf("ERROR: invalid input.\r\n");
@@ -376,6 +332,9 @@ void main_menu(){
       break;
     case 10:
       atc_menu();
+      break;
+    case 11:
+      hwcheck_menu();
       break;
 default:
       printf("invalid selection...\r\n");

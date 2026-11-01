@@ -1,6 +1,8 @@
 #ifndef __JUMPER_H__
 #define __JUMPER_H__
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -21,6 +23,10 @@ int  jumper_installed();
 
 // print the J5 state (installed, not installed, unreadable) as a status line
 void read_jumper_status();
+
+// The J5 gate for tests that write:  true with J5 removed;  otherwise prints a REFUSED line (J5
+// installed or unreadable) and returns false.
+bool jumper_allows_writes();
 
 #ifdef __cplusplus
 }

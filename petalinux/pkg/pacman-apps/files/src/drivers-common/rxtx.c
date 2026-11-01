@@ -461,7 +461,7 @@ void toggle_tx_mask(void){
     tx_mask_b = 0xFF;
     tx_mask_a = 0xFFFFFFFF;
   }
-  printf("RX mask:  0x%08x %08x \r\n", (unsigned int) tx_mask_b, (unsigned int) tx_mask_a);
+  printf("TX mask:  0x%08x %08x \r\n", (unsigned int) tx_mask_b, (unsigned int) tx_mask_a);
 }
 
 void zero_rxtx_counts(void){

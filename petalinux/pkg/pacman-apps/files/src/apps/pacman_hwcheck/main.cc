@@ -29,6 +29,7 @@
 #include "iic_menu.h"
 #include "atc_menu.h"
 #include "adc_menu.h"
+#include "hwcheck_menu.h"
 
 #define EXIT_PASS        0
 #define EXIT_FAIL        1
@@ -36,61 +37,6 @@
 #define EXIT_USAGE       3   // also: refused (J5 installed)
 
 // *** READ ONLY STATUS REPORT ***
-
-static void read_only_jumper(){
-  int j5 = jumper_installed();
-  if (j5 == JUMPER_UNREADABLE)
-    check_result("FAIL", "j5_jumper", "unreadable (MIO%d)", JUMPER_J5_MIO);
-  else
-    check_result("INFO", "j5_jumper", (j5 == JUMPER_IN) ? "installed" : "not installed");
-}
-
-static void read_only_global(global_status_t * gs){
-  char date[32], hash[32];
-  get_synthesis_date_string(date, sizeof(date));
-  get_git_hash_string(hash, sizeof(hash));
-
-  // Zipline firmware is 3.X; hwcheck v1 is for hardware 1v5:
-  check_result((gs->firmware_major == 3) ? "PASS" : "FAIL", "firmware_version", "%u.%u.%u",
-               (unsigned) gs->firmware_major, (unsigned) gs->firmware_minor, (unsigned) gs->firmware_patch);
-  check_result((gs->hardware_major == 1 && gs->hardware_minor == 5) ? "PASS" : "FAIL", "hardware_version", "%u.%u.%u",
-               (unsigned) gs->hardware_major, (unsigned) gs->hardware_minor, (unsigned) gs->hardware_patch);
-  check_result("INFO", "synthesis_date", "%s", date);
-  check_result("INFO", "git_hash", "%s", hash);
-  char build[48];
-  get_build_string(gs->build_flags, build, sizeof(build));
-  check_result("INFO", "firmware_build", "%s", build);
-  check_result("INFO", "vivado_version", "%u.%u", (unsigned) gs->vivado_major, (unsigned) gs->vivado_minor);
-  check_result("INFO", "enables", "0x%08x", (unsigned) gs->enables);
-  check_result("INFO", "status", "0x%08x", (unsigned) gs->status);
-}
-
-static void read_only_dma_status(const char * name, hw_val_t sr){
-  const hw_val_t errors = DMASR_DMA_INT_ERR | DMASR_DMA_SEC_ERR | DMASR_DMA_DEC_ERR
-                        | DMASR_SG_INT_ERR  | DMASR_SG_SEC_ERR  | DMASR_SG_DEC_ERR;
-  check_result((sr & errors) ? "FAIL" : "INFO", name, "0x%08x%s%s", (unsigned) sr,
-               (sr & DMASR_HALTED) ? " halted" : "", (sr & errors) ? " ERROR" : "");
-}
-
-static void read_only_rxtx(){
-  unsigned enabled = 0, frame = 0, noise = 0, lost = 0;
-  rx_uart_status_t us;
-  for (unsigned i = 0; i < 40; i++){
-    get_rx_uart_status(i, &us);
-    if (rx_uart_is_enabled(i)) enabled++;
-    frame += us.frame_err;
-    noise += us.noise;
-    lost  += us.lost;
-  }
-  check_result("INFO", "rx_uarts_enabled", "%u of 40", enabled);
-  check_result("INFO", "rx_frame_errors", "%u", frame);
-  check_result("INFO", "rx_noise", "%u", noise);
-  check_result("INFO", "rx_lost", "%u", lost);
-
-  dma_platform_init();
-  read_only_dma_status("dma_tx_status", dma_get_tx_status());
-  read_only_dma_status("dma_rx_status", dma_get_rx_status());
-}
 
 static void read_only_linux(){
   struct utsname u;
@@ -112,53 +58,9 @@ static void read_only_linux(){
   check_result("INFO", "eth0_address", "%s", ip);
 }
 
-// one I2C monitor reading; a failed transfer is reported as such, not as a value:
-static void iic_reading(const char * name, const char * fmt, unsigned a, unsigned b, hw_u32_t status){
-  if (status != 0)
-    check_result("FAIL", name, "no response (I2C status 0x%x)", (unsigned) status);
-  else
-    check_result("INFO", name, fmt, a, b);
-}
-
-static void read_only_iic(){
-  const char * board[] = {"3V6", "3V3", "3V0"};
-  char name[32];
-  unsigned a, b;
-
-  for (int i = 0; i < 3; i++){
-    snprintf(name, sizeof(name), "board_%s", board[i]);
-    a = iic_mon_vboard_mv(i);
-    b = iic_mon_iboard_ma(i);
-    iic_reading(name, "%5u mV %5u mA", a, b, iic_platform_status());
-  }
-  a = iic_mon_vboard_mv(3);
-  b = iic_mon_probe_dn();
-  iic_reading("rtd_probe", "%5u mV 0x%04x DN", a, b, iic_platform_status());
-
-  for (int i = 0; i < 10; i++){
-    snprintf(name, sizeof(name), "tile_%02d_vdda", i+1);
-    a = iic_mon_vdda_mv(i);
-    b = iic_mon_idda_ma(i);
-    iic_reading(name, "%5u mV %5u mA", a, b, iic_platform_status());
-    snprintf(name, sizeof(name), "tile_%02d_vddd", i+1);
-    a = iic_mon_vddd_mv(i);
-    b = iic_mon_iddd_ma(i);
-    iic_reading(name, "%5u mV %5u mA", a, b, iic_platform_status());
-  }
-}
-
 static void read_only(bool no_iic){
-  global_status_t gs;
-  get_global_status(&gs);
-
-  read_only_jumper();
-  read_only_global(&gs);
-  read_only_rxtx();
+  hwcheck_read_only(no_iic);
   read_only_linux();
-  if (no_iic)
-    check_result("SKIP", "i2c_monitors", "--no_i2c");
-  else
-    read_only_iic();
 }
 
 static void usage(){
@@ -290,10 +192,8 @@ int main(int argc, char * argv[]){
   init_jumper();
 
   // J5 = production jumper:  only --read_only runs with it installed
-  if (writes && jumper_installed() != JUMPER_OUT){
-    printf("REFUSED:  J5 installed (or unreadable): only --read_only runs on a production board.\n");
+  if (writes && !jumper_allows_writes())
     return EXIT_USAGE;
-  }
 
   global_status_t gs;
   get_global_status(&gs);

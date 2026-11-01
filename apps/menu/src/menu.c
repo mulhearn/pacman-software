@@ -23,6 +23,7 @@
 #include "iic_menu.h"
 #include "asic_menu.h"
 #include "atc_menu.h"
+#include "hwcheck_menu.h"
 
 #define EMAC_DEVICE_ID      XPAR_XEMACPS_0_DEVICE_ID
 #define PHY_ADDRESS         0x1A    // Your CPLD PHY address
@@ -264,6 +265,7 @@ int main(){
     printf("(1) blink LEDs (2) read global status (3) toggle scratch (4) toggle enables (5) toggle dcache \r\n");
     printf("(6) read MAC From CPLD (7) toggle CPLD config \r\n");
     printf("(a) I2C menu (b) RX/TX menu (c) ATC menu (d) ADC menu (e) single ASIC menu\r\n");
+    printf("(f) hardware check menu\r\n");
     unsigned char c=inbyte();
     printf("pressed:  %c\r\n", c);
     switch(c){
@@ -302,6 +304,9 @@ int main(){
       break;
     case 'e':
       asic_menu();
+      break;
+    case 'f':
+      hwcheck_menu();
       break;
     default:
       printf("invalid selection...\r\n");

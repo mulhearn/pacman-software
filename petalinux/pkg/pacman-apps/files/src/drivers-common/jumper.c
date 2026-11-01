@@ -19,6 +19,14 @@ int jumper_installed() {
   return (value == 0) ? JUMPER_IN : JUMPER_OUT;
 }
 
+bool jumper_allows_writes() {
+  if (jumper_installed() == JUMPER_OUT)
+    return true;
+  printf("REFUSED:  J5 installed (or unreadable): only the read-only report runs on a production "
+         "board.\r\n");
+  return false;
+}
+
 void read_jumper_status() {
   int j5 = jumper_installed();
   printf("J5 jumper---------------- %s   \r\n",
