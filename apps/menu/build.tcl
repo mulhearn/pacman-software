@@ -2,6 +2,6 @@
 setws .
 
 # Build
-app build demo
+app build menu
 
 

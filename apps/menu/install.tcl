@@ -15,7 +15,12 @@ file rename menu/menu/src/helloworld.c menu/menu/src/menu.c
 file copy apps/menu/run.tcl menu/
 file copy apps/menu/build.tcl menu/
 
-# now copy everything from src/, -force overwrites menu.c with the real one
+# the drivers are the Linux ones (petalinux/pkg/pacman-apps/files/src:  drivers-common and platform/hw_access.h);
+# apps/menu/src holds only the bare-metal menu.c and hw_access.c;  -force overwrites menu.c with the real one
+foreach f [glob petalinux/pkg/pacman-apps/files/src/drivers-common/*] {
+    file copy -force $f menu/menu/src/
+}
+file copy -force petalinux/pkg/pacman-apps/files/src/platform/hw_access.h menu/menu/src/
 foreach f [glob apps/menu/src/*] {
     file copy -force $f menu/menu/src/
 }
