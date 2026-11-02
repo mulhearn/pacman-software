@@ -26,7 +26,7 @@ if [ -d "$PROJ/project-spec.prev" ]; then
     exit 0
 fi
 
-# BASELINE is the project-spec directory provided by TRENZ for the test board design:
+# Baseline is the project-spec directory provided by TRENZ for the test board design:
 mv $PROJ/project-spec $PROJ/project-spec.prev
 cp -r $SRC/trenz/project-spec $PROJ/
 
@@ -36,7 +36,12 @@ cp -v $SRC/$SPEC/system-user.dtsi  $PROJ/project-spec/meta-user/recipes-bsp/devi
 cp -v $SRC/$SPEC/user-rootfsconfig $PROJ/project-spec/meta-user/conf/
 cp -v $SRC/$SPEC/rootfs_config     $PROJ/project-spec/configs/rootfs_config
 cp -v $SRC/$SPEC/config            $PROJ/project-spec/configs/config
+cp -v $SRC/common/bsp.cfg          $PROJ/project-spec/meta-user/recipes-bsp/u-boot/files/bsp.cfg
 
 # add PACMAN software package:
 ln -sfn  ../../../../$PKG/pacman-apps $PROJ/project-spec/meta-user/recipes-apps/
+
+# site overlay (applies petalinux/site when present):
+mkdir -p $PROJ/project-spec/meta-user/recipes-core
+ln -sfn  ../../../../$PKG/pacman-site $PROJ/project-spec/meta-user/recipes-core/
 

@@ -748,7 +748,7 @@ CONFIG_pciutils=y
 #
 # screen 
 #
-# CONFIG_screen is not set
+CONFIG_screen=y
 # CONFIG_screen-dbg is not set
 # CONFIG_screen-dev is not set
 
@@ -2215,7 +2215,7 @@ CONFIG_linux-xlnx-udev-rules=y
 #
 # gdb 
 #
-# CONFIG_gdb is not set
+CONFIG_gdb=y
 # CONFIG_gdb-dbg is not set
 # CONFIG_gdb-dev is not set
 # CONFIG_gdbserver is not set
