@@ -14,8 +14,8 @@ SD_WRITE=0
 SD_WRITE_MB=16
 
 NOMINAL_CPUS=2
-MEM_MIN_MB=900       # TE0720:  1 GB DDR3
-MEM_MAX_MB=1100
+MEM_MIN_MB=700       # TE0720:  1 GB DDR3, less the 256 MB DMA buffer
+MEM_MAX_MB=800
 TEMP_MIN_C=5
 TEMP_MAX_C=85
 SUPPLY_PCT=5         # XADC supplies, +/- percent of nominal
