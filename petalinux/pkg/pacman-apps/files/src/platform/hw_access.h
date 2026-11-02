@@ -112,6 +112,28 @@ hw_val_t axil_read_register  (hw_addr_t offset);
 void     axil_write_register (hw_addr_t offset, hw_val_t value);
 
 //
+// AXI-LITE timing register access:
+//
+
+// initialize the AXI-LITE interface for register access:
+void timing_platform_init();
+
+// initialize the AXI-LITE interface for register access:
+void timing_platform_close();
+
+// report the status of the AXI-LITE interface:
+hw_u32_t timing_platform_status();
+
+// clear any errors in the AXI-LITE interface:
+void timing_platform_clear_status();
+
+// read the HW registers with offset <offset> relative to the AXI-LITE base address:
+hw_val_t timing_read_register  (hw_addr_t offset);
+
+// write <value> to the HW registers with offset <offset> relative to the AXI-LITE base address:
+void     timing_write_register (hw_addr_t offset, hw_val_t value);
+
+//
 // DMA Registers:
 //
 
@@ -156,11 +178,20 @@ void iic_platform_init();
 // close the I2C interface:
 void iic_platform_close();
 
-// report the status of the AXI-LITE interface:
+// Report the I2C platform layer status.  The status is sticky and set at the first failed read or
+// write (with its device and register) or init.  While it is non-zero, iic_write, iic_read and
+// iic_write_read do nothing (read zero) until it is reset.
 hw_u32_t iic_platform_status();
 
-// report the status of the AXI-LITE interface:
-void iic_platform_clear_status();
+// Reset the I2C platform layer:  recover the bus (controller reset, SCL clocked free) and clear
+// the status.
+void iic_platform_reset();
+
+// Print the I2C platform layer status.
+void iic_platform_print_status();
+
+// The I2C clock rate in Hz (as configured).
+hw_u32_t iic_platform_clock_hz();
 
 // Write a sequence of bytes to an I2C device.
 // addr: 7-bit device address
@@ -174,8 +205,19 @@ void iic_write(hw_u8_t addr, hw_u8_t reg, const hw_u8_t *data, hw_u32_t len);
 // reg: register within device
 // data: pointer to hw_u8 array to receive bytes
 // len: number of bytes to read
-// use_repeated_read: true to use repeated read (default behavior)
+// use_repeated_read:  true:  register write, repeated start, read;
+//                     false:  register write, stop, read
 void iic_read(hw_u8_t addr, hw_u8_t reg, hw_u8_t *data, hw_u32_t len, bool use_repeated_read);
+
+// Write a sequence of bytes, then read a sequence of bytes, from an I2C device
+// (for commands longer than one byte, e.g. the AD5677 readback).
+// addr:  7-bit device address
+// wdata, wlen:  bytes to write (wlen at least 1)
+// rdata, rlen:  bytes to read
+// use_repeated_read:  true:  write, repeated start, read;
+//                     false:  write, stop, read
+void iic_write_read(hw_u8_t addr, const hw_u8_t *wdata, hw_u32_t wlen, hw_u8_t *rdata,
+                    hw_u32_t rlen, bool use_repeated_read);
 
 //
 // PS GPIO (MIO) Interface:
@@ -228,10 +270,15 @@ void stop_hw_timer();
 hw_u32_t hw_timer_elapsed_us();
 
 //
-// Menu option utility:
+// Menu input:
 //
-// return last character pressed before enter:
-char input_choice();
+// Every menu reads its choice this way:  a letter, then Enter.
+
+#define INPUT_END  -1   // input_choice() at the end of input (stdin closed):  leave the menu
+
+// Prompt, read one line from the console (echoed, Enter included) and return its first character
+// (0 for an empty line), or INPUT_END.
+int input_choice();
 
 #ifdef __cplusplus
 }

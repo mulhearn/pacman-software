@@ -8,14 +8,44 @@
 extern "C" {
 #endif
 
+// IV curve of one tile:  both DACs swept together, 0x0000 to 0xF000 in steps of 0x1000,
+// left at 0 afterwards.  The enables are not touched.
+#define IIC_IV_POINTS 16
+
+typedef struct {
+  hw_val_t dac_dn;
+  hw_val_t vdda_mv, idda_ma;
+  hw_val_t vddd_mv, iddd_ma;
+} iic_iv_point_t;
+
+void iic_get_iv_curve(hw_val_t itile, iic_iv_point_t iv[IIC_IV_POINTS]);
+
 // menu interface to ASIC driver:
 void iic_menu();
 
 // menu options:
 void iic_show_status();
+void iic_reset_bus();
 void iic_toggle_hardware_version();
 void iic_toggle_power();
+void iic_monitor_tile_power(int itile);  // itile 0 = tile 1
 void iic_monitor_power();
+void iic_toggle_test_dac();
+void iic_record_iv_curves();
+
+// Check the board rails, and each tile in tile_mask (one at a time) swept over the DAC range into
+// the card's loads, the other tiles checked off.
+void iic_check_power(hw_u32_t tile_mask);
+
+// Put R28 across the SMA jacks J1001 (P) and J14 (N), then open the MUX:  with pause, after the
+// operator presses Enter;  without, at once (the path exercised).
+void iic_check_sma(bool pause);
+
+
+#define IIC_STRESS_SWEEPS 100   // The default number of sweeps for stress test
+  
+// Stress the I2C bus with safe transactions over every device
+void iic_check_stress(hw_u32_t sweeps);
 
 #ifdef __cplusplus
 }

@@ -113,7 +113,7 @@ static inline uint32_t total_message_size(const pacman_msg_t * msg){
 
 
 
-inline void write_header_req(pacman_header_t* h, uint16_t n_bytes = 0, uint32_t timestamp_hi = 0, uint32_t timestamp_lo = 0, uint8_t pacman = 0) {
+inline void write_header_req(pacman_header_t* h, uint32_t n_bytes = 0, uint32_t timestamp_hi = 0, uint32_t timestamp_lo = 0, uint8_t pacman = 0) {
     memset(h, 0, sizeof(*h));
     h->msg_type      = MSG_TYPE_REQ;
     h->pacman        = pacman;
@@ -124,7 +124,7 @@ inline void write_header_req(pacman_header_t* h, uint16_t n_bytes = 0, uint32_t 
     h->timestamp_hi  = timestamp_hi;
 }
 
-inline void write_header_rep(pacman_header_t* h, uint16_t n_bytes = 0, uint32_t timestamp_hi = 0, uint32_t timestamp_lo = 0, uint8_t pacman = 0) {
+inline void write_header_rep(pacman_header_t* h, uint32_t n_bytes = 0, uint32_t timestamp_hi = 0, uint32_t timestamp_lo = 0, uint8_t pacman = 0) {
     memset(h, 0, sizeof(*h));
     h->msg_type      = MSG_TYPE_REP;
     h->pacman        = pacman;
@@ -135,7 +135,7 @@ inline void write_header_rep(pacman_header_t* h, uint16_t n_bytes = 0, uint32_t 
     h->timestamp_hi  = timestamp_hi;
 }
 
-inline void write_header_data(pacman_header_t* h, uint16_t n_bytes = 0, uint32_t timestamp_hi = 0, uint32_t timestamp_lo = 0, uint8_t pacman = 0) {
+inline void write_header_data(pacman_header_t* h, uint32_t n_bytes = 0, uint32_t timestamp_hi = 0, uint32_t timestamp_lo = 0, uint8_t pacman = 0) {
     memset(h, 0, sizeof(*h));
     h->msg_type      = MSG_TYPE_DATA;
     h->pacman        = pacman;
@@ -183,7 +183,7 @@ inline void write_word_data(pacman_word_t* w, uint8_t pacman, uint16_t chan,
     w->data.payload_hi   = payload_hi;
 }
 
-inline void write_word_sync(pacman_word_t* w, uint8_t pacman, uint8_t sync_type, uint8_t clk_src, uint32_t timestamp_hi, uint32_t timestamp_lo, uint8_t status) {
+inline void write_word_sync(pacman_word_t* w, uint8_t pacman, uint8_t sync_type, uint8_t clk_src, uint32_t timestamp_hi, uint32_t timestamp_lo, uint32_t status) {
     memset(w, 0, sizeof(*w));
     w->sync.word_type = 'S';
     w->sync.pacman    = pacman;

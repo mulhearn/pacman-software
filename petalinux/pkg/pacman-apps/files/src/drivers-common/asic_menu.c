@@ -4,47 +4,35 @@
 #include "global.h"
 #include "iic.h"
 #include "dma.h"
+#include "atc.h"
 #include "rxtx.h"
 #include "asic.h"
 #include "asic_menu.h"
-
+#include "iic_menu.h"
+#include "atc.h"
 
 static int CHIP_ID = 11;
 
 void asic_toggle_chip_id(){
   static int mode = 0;
-  mode = (mode + 1) % 5;
+  mode = (mode + 1) % 6;
 
-  int chip_id_vals[] = {11,12,13,14,255};
+  int chip_id_vals[] = {11,12,13,14,1,255};
 
   printf("INFO:  setting chip ID to %d\r\n", chip_id_vals[mode]);
   CHIP_ID = chip_id_vals[mode];
 }
 
 void asic_full_reset(){
-  const hw_u32_t mask = 0x3FF;
   printf("INFO: sending full reset \r\n");
-
-  // update pulse duration for full reset (1023 cycles):
-  axil_write_register(0xE118, 0x03FF3FF5);
-  axil_write_register(0xE100, 0x00);
-  usleep(10);
-
-  // reset pulses triggered by poke C
-  axil_write_register(0xE0C0, mask);
-  usleep(100);
-
-  // set pulse duration back to default (internal reset, 8 cycles):
-  axil_write_register(0xE118, 0x03FF0085);
-  axil_write_register(0xE100, 0x00);
-  usleep(10);
+  const hw_u32_t mask = 0x3FF;
+  axil_write_register(0xE0D0, mask);
 }
 
 void asic_internal_reset(){
   printf("INFO: sending internal reset \r\n");
   const hw_u32_t mask = 0x3FF;
   axil_write_register(0xE0C0, mask);
-
 }
 
 void asic_toggle_version(){
@@ -76,6 +64,27 @@ void asic_toggle_power(){
     iic_set_vddd_dn(0, 0x75FF);
     axil_write_register(SCOPE_GLOBAL+C_ADDR_GLOBAL_ENABLES, 0x00010001);
   }
+}
+
+// Monitor power for Tile 1 only
+void asic_monitor_power(){
+  iic_monitor_tile_power(0);
+}
+
+// Step the tile 1 DAC codes above nominal (+0, +5, +10, +15 % of the code)
+void asic_step_power(){
+  static const unsigned pct[] = {0, 5, 10, 15};
+  static int step = 0;
+  step = (step + 1) % 4;
+
+  unsigned vdda_dn = 0xE2FF * (100 + pct[step]) / 100;
+  unsigned vddd_dn = 0x75FF * (100 + pct[step]) / 100;
+  if (vdda_dn > 0xFFFF) vdda_dn = 0xFFFF;
+  if (vddd_dn > 0xFFFF) vddd_dn = 0xFFFF;
+  printf("setting tile 1 DAC codes to nominal +%u %%:  VDDA 0x%04x VDDD 0x%04x\r\n", pct[step], vdda_dn, vddd_dn);
+  iic_set_vdda_dn(0, vdda_dn);
+  iic_set_vddd_dn(0, vddd_dn);
+  printf("VDDA:  voltage:  %5d mV\r\n", (int) iic_mon_vdda_mv(0));
 }
 
 void asic_toggle_rx_uart_enables(){
@@ -136,6 +145,29 @@ void asic_config_root(){
   asic_batch_tx(payload, NUM_WORDS);
 
   usleep(10000);
+
+  NUM_WORDS = 6;
+  //piso downstream:
+  asic_config_write(&payload[0], CHIP_ID, 125, 0x1);
+  //piso upstream:
+  asic_config_write(&payload[2], CHIP_ID, 124, 0x2);
+  //tx slices, all on:
+  asic_config_write(&payload[4], CHIP_ID, 239, 0xFF);
+  asic_config_write(&payload[6], CHIP_ID, 240, 0xFF);
+  //tx current per slice, full (active low):
+  asic_config_write(&payload[8], CHIP_ID, 241, 0x00);
+  asic_config_write(&payload[10], CHIP_ID, 242, 0x00);
+
+  for (unsigned i=0; i< NUM_WORDS; i++){
+    asic_print_packet_summary(&payload[2*i]);
+  }
+
+  printf("INFO sending... \n");
+  asic_batch_tx(payload, NUM_WORDS);
+
+
+
+  return;
 
   NUM_WORDS = 12;
   // set various enables:
@@ -210,7 +242,7 @@ void asic_hello(){
 }
 
 void asic_read_rx(){
-  unsigned verbose = 0;
+  unsigned verbose = 1;
   unsigned count = 0;
   hw_addr_t nxta;
   hw_u64_t start = 0;
@@ -233,13 +265,14 @@ void asic_read_rx(){
 
     if (((trailer[0]&0xFF) != 0x4C) || (trailer[2] != words)){
       printf("ERROR: invalid trailer detected in DMA packet... skipping.\r\n");
-      printf("DMA packet tailer: 0x%x %x 0x%x %x 0x%x %x\r\n",
+      printf("DMA packet tailer: 0x%08x %08x 0x%08x %08x 0x%08x %08x\r\n",
 	     (unsigned int) trailer[5], (unsigned int) trailer[4], (unsigned int) trailer[3],
 	     (unsigned int) trailer[2], (unsigned int) trailer[1], (unsigned int) trailer[0]);
+      printf("words:  %d\r\n", words);
       dma_add_rx_bd(nxta);
       continue;
     } else if (verbose) {
-      printf("DMA packet tailer: 0x%x %x 0x%x %x 0x%x %x\r\n",
+      printf("DMA packet tailer: 0x%08x %08x 0x%08x %08x 0x%08x %08x\r\n",
 	     (unsigned int) trailer[5], (unsigned int) trailer[4], (unsigned int) trailer[3],
 	     (unsigned int) trailer[2], (unsigned int) trailer[1], (unsigned int) trailer[0]);
     }
@@ -361,17 +394,22 @@ void asic_menu(){
   printf("ASIC menu:  \r\n");
   while(1){
     printf("choose an option:\r\n");
-    printf("(x) Exit ASIC menu\r\n");
-    printf("(v) toggle ASIC version (u) toggle RX UART enables (p) toggle ASIC power\r\n");
+    printf("(x) Exit ASIC menu (d) default ATC config\r\n");
+    printf("(v) toggle ASIC version (u) toggle RX UART enables (p) toggle ASIC power (m) monitor tile 1 power (b) step power +5%%\r\n");
     printf("(f) send full reset (i) send internal reset (c) config root chip \r\n");
     printf("(a) request all registers (h) hello ASIC (r) read RX \r\n");
-    printf("(l) run ASIC loopback test (d) toggle chip id \r\n");
-    char input = input_choice();
+    printf("(l) run ASIC loopback test (n) toggle chip id \r\n");
+    int input = input_choice();
+    if (input == INPUT_END)
+      return;
     printf("INFO: selected %c\r\n", input);
 
     switch(input){
     case 'x':
       return;
+    case 'd':
+      set_atc_default_config();
+      break;
     case 'v':
       asic_toggle_version();
       break;
@@ -380,6 +418,12 @@ void asic_menu(){
       break;
     case 'p':
       asic_toggle_power();
+      break;
+    case 'b':
+      asic_step_power();
+      break;
+    case 'm':
+      asic_monitor_power();
       break;
     case 'f':
       asic_full_reset();
@@ -396,7 +440,7 @@ void asic_menu(){
     case 'h':
       asic_hello();
       break;
-    case 'd':
+    case 'n':
       asic_toggle_chip_id();
       break;
     case 'r':

@@ -18,16 +18,18 @@ int main(int argc, char* argv[]) {
     unsigned nwords   = 1;
     unsigned n_tx     = 1000;
     unsigned delay_us = 132;
+    unsigned chan     = 0;
 
     int opt;
-    while ((opt = getopt(argc, argv, "v:w:n:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "v:w:n:d:c:")) != -1) {
         switch(opt) {
             case 'v': verbose   = std::atoi(optarg); break;
             case 'w': nwords    = std::atoi(optarg); break;
             case 'n': n_tx      = std::atoi(optarg); break;
             case 'd': delay_us  = std::atoi(optarg); break;
+	    case 'c': chan      = std::atoi(optarg); break;
             default:
-                printf("Usage: %s [-v verbose] [-w nwords] [-n n_tx] [-d delay_us]\n", argv[0]);
+                printf("Usage: %s [-v verbose] [-w nwords] [-n n_tx] [-d delay_us] [-c chan]\n", argv[0]);
                 return 1;
         }
     }
@@ -96,9 +98,12 @@ int main(int argc, char* argv[]) {
         for (unsigned i = 0; i < nwords; i++) {
 	  uint32_t payload_hi = rand();
 	  uint32_t payload_lo = rand();
-	  write_word_data(&msg_buf.words[i], 0, 1+i%40, upper_32(ts), lower_32(ts), payload_hi, payload_lo);
-        }
-
+	  if (chan > 0) {
+	    write_word_data(&msg_buf.words[i], 0, chan, upper_32(ts), lower_32(ts), payload_hi, payload_lo);
+	  } else {
+	    write_word_data(&msg_buf.words[i], 0, 1+i%40, upper_32(ts), lower_32(ts), payload_hi, payload_lo);
+	  }
+	}
         if (verbose) {
             if (check_msg(&msg_buf))
                 printf("DEBUG: valid message...\n");

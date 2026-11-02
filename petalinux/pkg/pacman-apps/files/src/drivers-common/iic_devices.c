@@ -1,6 +1,6 @@
-// iic_hw1v5.c
+// iic_devices.c
 //
-// I2C implementation specific to PACMAN 1V5
+// I2C devices (see iic_devices.h)
 //
 
 #include <assert.h>
@@ -11,9 +11,11 @@
 #define AD5677_NUM_CHAN   16
 
 #define PAC1944_SINGLE_SHOT_CFG 0x85
+#define PAC1944_REG_VOLT_BASE   0x07  // VBUS channels 1-4
+#define PAC1944_REG_CURR_BASE   0x0B  // VSENSE channels 1-4
 
 void ad5677_set_voltage(hw_u8_t addr, hw_u8_t chan, hw_val_t val) {
-  assert(chan <= AD5677_NUM_CHAN); // 16-channel DAC
+  assert(chan < AD5677_NUM_CHAN); // 16-channel DAC:  channels 0-15
 
   hw_u8_t reg = AD5677_BASE_REG + chan;
   hw_u8_t buf[2];
@@ -23,7 +25,17 @@ void ad5677_set_voltage(hw_u8_t addr, hw_u8_t chan, hw_val_t val) {
   iic_write(addr, reg, buf, 2);
 }
 
-hw_val_t pac1944_adc_dn(hw_u8_t addr, hw_u8_t reg){
+#define AD5677_READBACK   0x90   // Readback command, OR the channel
+
+hw_val_t ad5677_read(hw_u8_t addr, hw_u8_t chan) {
+  assert(chan < AD5677_NUM_CHAN);
+  hw_u8_t cmd[3] = { AD5677_READBACK | chan, 0, 0 };   // The full command:  1 byte is refused
+  hw_u8_t buf[2];
+  iic_write_read(addr, cmd, 3, buf, 2, true);
+  return ((hw_val_t) buf[0] << 8) | buf[1];
+}
+
+static hw_val_t pac1944_adc_dn(hw_u8_t addr, hw_u8_t reg){
   hw_u8_t buf[2];
 
   // Configure single-shot mode
@@ -37,37 +49,76 @@ hw_val_t pac1944_adc_dn(hw_u8_t addr, hw_u8_t reg){
   usleep(5000);
 
   // Read the output register
-  iic_write(addr, reg, NULL, 0);
   iic_read(addr, reg, buf, 2, false);
 
   uint32_t val = (buf[0] << 8) | buf[1];
   return val;
 }
 
-void max14661_set_coma(hw_u8_t addr, hw_val_t code) {
-  const hw_u8_t reg = 0x14;
-  const hw_u8_t nbytes = 1;
-
-  hw_u8_t buf[1] = { (hw_u8_t) code };
-  iic_write(addr, reg, buf, nbytes);
+hw_val_t pac1944_v_dn(hw_u8_t addr, hw_val_t chan){
+  return (chan < 4) ? pac1944_adc_dn(addr, PAC1944_REG_VOLT_BASE + chan) : 0;
 }
 
-void max14661_set_comb(hw_u8_t addr, hw_val_t code) {
-  const hw_u8_t reg = 0x15;
-  const hw_u8_t nbytes = 1;
+hw_val_t pac1944_i_dn(hw_u8_t addr, hw_val_t chan){
+  return (chan < 4) ? pac1944_adc_dn(addr, PAC1944_REG_CURR_BASE + chan) : 0;
+}
 
-  hw_u8_t buf[1] = { (hw_u8_t) code };
-  iic_write(addr, reg, buf, nbytes);
+#define PAC1944_REG_MANUFACTURER 0xFE
+
+hw_u8_t pac1944_id(hw_u8_t addr){
+  hw_u8_t id;
+  iic_read(addr, PAC1944_REG_MANUFACTURER, &id, 1, false);
+  return id;
+}
+
+#define MAX14661_REG_DIR0   0x00  // switch state:  DIR0-1 COMA, DIR2-3 COMB
+#define MAX14661_REG_SHDW0  0x10  // shadow:  same layout
+#define MAX14661_REG_CMD_A  0x14  // CMD_B follows
+
+void max14661_cmd(hw_u8_t addr, hw_u8_t cmd_a, hw_u8_t cmd_b){
+  iic_write(addr, MAX14661_REG_CMD_A,     &cmd_a, 1);
+  iic_write(addr, MAX14661_REG_CMD_A + 1, &cmd_b, 1);
+}
+
+void max14661_write_shadow(hw_u8_t addr, hw_val_t common, hw_val_t mask){
+  hw_u8_t lo = mask & 0xFF, hi = (mask >> 8) & 0xFF;
+  iic_write(addr, MAX14661_REG_SHDW0 + 2*common,     &lo, 1);
+  iic_write(addr, MAX14661_REG_SHDW0 + 2*common + 1, &hi, 1);
+}
+
+hw_val_t max14661_read(hw_u8_t addr, hw_val_t common){
+  hw_u8_t lo, hi;
+  iic_read(addr, MAX14661_REG_DIR0 + 2*common,     &lo, 1, false);
+  iic_read(addr, MAX14661_REG_DIR0 + 2*common + 1, &hi, 1, false);
+  return ((hw_val_t) hi << 8) | lo;
+}
+
+hw_val_t max14661_read_shadow(hw_u8_t addr, hw_val_t common){
+  hw_u8_t lo, hi;
+  iic_read(addr, MAX14661_REG_SHDW0 + 2*common,     &lo, 1, false);
+  iic_read(addr, MAX14661_REG_SHDW0 + 2*common + 1, &hi, 1, false);
+  return ((hw_val_t) hi << 8) | lo;
+}
+
+void max14661_write_reg(hw_u8_t addr, hw_u8_t reg, hw_u8_t value) {
+  iic_write(addr, reg, &value, 1);
 }
 
 #define INA220_REG_I       0x1        // Shunt Voltage Register
 #define INA220_REG_V       0x2        // BUS Voltage Register
+#define INA220_REG_CONFIG  0x0        // Configuration Register
+
+hw_val_t ina220_config(hw_u8_t addr){
+  hw_u8_t buf[2];
+  iic_read(addr, INA220_REG_CONFIG, buf, 2, true);
+  return (((hw_val_t) buf[0]) << 8) | buf[1];
+}
 
 
 hw_val_t ina220_v_adc_dn(hw_u8_t addr){
   hw_u8_t buf[2];
 
-  iic_read(addr, INA220_REG_V, buf, 2, false);  // TODO:  try repeated read = true, which should be default...
+  iic_read(addr, INA220_REG_V, buf, 2, true);
 
   hw_val_t reg = (((hw_val_t) buf[0]) << 8) | buf[1];
   hw_val_t dn = (reg >> 3); // D0 is at bit 3
@@ -78,7 +129,7 @@ hw_val_t ina220_v_adc_dn(hw_u8_t addr){
 hw_val_t ina220_i_adc_dn(hw_u8_t addr){
   hw_u8_t buf[2];
 
-  iic_read(addr, INA220_REG_I, buf, 2, false);  // TODO:  try repeated read = true, which should be default...
+  iic_read(addr, INA220_REG_I, buf, 2, true);
 
   hw_val_t reg = (((hw_val_t) buf[0]) << 8) | buf[1];
   hw_val_t dn  = reg;
@@ -94,9 +145,16 @@ hw_val_t ina220_i_adc_dn(hw_u8_t addr){
 #define ADS1219_REG_RDATA      0x10
 #define ADS1219_MASK_READY     0x80
 #define ADS1219_SHIFT_MUX      5
+#define ADS1219_REG_CONFIG     0x20   // RREG of the configuration register
+
+hw_u8_t ads1219_config(hw_u8_t addr){
+  hw_u8_t cfg;
+  iic_read(addr, ADS1219_REG_CONFIG, &cfg, 1, true);
+  return cfg;
+}
 
 hw_val_t ads1219_adc_dn(hw_u8_t addr, hw_u8_t mux){
-  hw_val_t timeout = 100;
+  int ready = 0;
   hw_u8_t buf[4];
 
   if (mux > 0x7)
@@ -108,14 +166,17 @@ hw_val_t ads1219_adc_dn(hw_u8_t addr, hw_u8_t mux){
   buf[0] = cfg;
   iic_write(addr, ADS1219_REG_CFG, buf, 1);
   iic_write(addr, ADS1219_REG_START, NULL, 0);
-  while(timeout--){
+  for (int i = 0; i < 100 && !iic_platform_status(); i++){
     iic_read(addr, ADS1219_REG_READY, buf, 1, true);
-    if (buf[0] & ADS1219_MASK_READY)
+    if (buf[0] & ADS1219_MASK_READY) {
+      ready = 1;
       break;
+    }
     usleep(1000);
   }
-  if (!timeout) {
-    printf("ERROR: timeout waiting on ADS1219 ready bit");
+  if (!ready) {
+    if (!iic_platform_status())
+      printf("ERROR: timeout waiting on ADS1219 ready bit (addr 0x%x)\r\n", addr);
     return 0;
   }
 

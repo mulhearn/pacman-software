@@ -4,7 +4,6 @@
 
 #include "pacman_message.hh"
 #include "tx_buffer.hh"
-#include "rx_buffer.hh"
 #include "asic.h"
 
 // Placeholder for user test function
@@ -252,110 +251,6 @@ int test_tx_buffer(){
   return 1;
 }
 
-int test_rx_buffer(){
-  int success = 1;
-  uint32_t rx_data[6];
-
-  printf("INFO:  ****** running rx buffer unit test. ****** \n");
-  rx_buffer_init(1);
-
-  printf("INFO:  checking basic functionality.\n");
-
-  rx_buffer_status();
-
-  rx_data[0]=0xAAAAAAAA;
-  rx_data[1]=0xBBBBBBBB;
-  rx_data[2]=0xCCCCCCCC;
-  rx_data[3]=0xDDDDDDDD;
-  rx_data[4]=0xEEEEEEEE;
-  rx_data[5]=0xFFFFFFFF;
-
-  success &= (rx_buffer_in(rx_data)==1);
-  success &= (rx_buffer_in(rx_data)==1);
-  success &= (rx_buffer_in(rx_data)==1);
-  success &= (rx_buffer_count()==3);
-
-  rx_buffer_status();
-
-  success &= (rx_buffer_out(rx_data)==1);
-  rx_buffer_print_output(rx_data);
-  success &= (rx_buffer_count()==2);
-
-  success &= (rx_buffer_out(rx_data)==1);
-  success &= (rx_buffer_out(rx_data)==1);
-  success &= (rx_buffer_out(rx_data)==0);
-
-  rx_buffer_status();
-
-  // check no losses:
-  success &= (rx_buffer_lost()==0);
-
-  if (success==0){
-    printf("ERROR:  failed basic functionality test.\n");
-    return 0;
-  } else {
-    printf("INFO:  ...success so far.\n");
-  }
-
-  printf("INFO:  Filling the entire buffer.\n");
-
-  // completely fill the entire buffer:
-  for (unsigned i=0; i<RX_BUFFER_DEPTH-1; i++){
-    unsigned I = i%1024;
-    rx_data[0] = I;
-    rx_data[1] = 2*I;
-    success &= (rx_buffer_in(rx_data)==1);
-  }
-
-  // check no losses:
-  success &= (rx_buffer_lost()==0);
-
-  // how about this wafer thin mint?
-  success &= (rx_buffer_in(rx_data)==0);
-
-  // check loss detected:
-  success &= (rx_buffer_lost()==1);
-
-  if (success==0){
-    printf("ERROR:  filling the entire buffer failed.\n");
-    return 0;
-  } else {
-    printf("INFO:  ...success so far.\n");
-  }
-
-  printf("INFO:  Draining the entire buffer and checking contents\n");
-
-  // drain the entire buffer:
-  for (unsigned i=0; i<RX_BUFFER_DEPTH-1; i++){
-    unsigned I = i%1024;
-    success &= (rx_buffer_out(rx_data)==1);
-    success &= (rx_data[0] == I);
-    success &= (rx_data[1] == 2*I);
-    //printf("DEBUG: rx_data %3d 0x%lx %lx\n", i, rx_data[1], rx_data[0]);
-    if (success==0){
-      printf("ERROR:  draining the entire buffer.\n");
-      return 0;
-    }
-  }
-
-  //confirm empty:
-  success &= (rx_buffer_out(rx_data)==0);
-
-  // check no more loss detected:
-  success &= (rx_buffer_lost()==1);
-
-
-  rx_buffer_status();
-
-  if (success==0){
-    printf("ERROR:  rx buffer unit test FAILED.\n");
-    return 0;
-  }
-
-  printf("SUMMARY:  rx buffer unit test SUCCESS.\n");
-  return 1;
-}
-
 int test_asic_util(){
   int success = 1;
   const unsigned MAX_NUM_WORDS = 20;
@@ -402,7 +297,6 @@ int main(){
   int success = 1;
   success &= test_pacman_message();
   success &= test_tx_buffer();
-  success &= test_rx_buffer();
   success &= test_asic_util();
   if (success) {
     printf("SUMMARY:  *************************************************\n");

@@ -1,7 +1,7 @@
 # Makefile for pacman apps
 
 # apps and supporting library
-APPS     := pacman_menu pacman_units pacman_cmdserver pacman_dataserver pacman_counter pacman_push
+APPS     := pacman_menu pacman_hwcheck pacman_fwcheck pacman_units pacman_cmdserver pacman_dataserver pacman_counter pacman_push
 LIB_NAME := libdrivers.a
 
 # directories
@@ -22,8 +22,13 @@ $(LINUX_SRCS:$(SRC_DIR)/drivers-linux/%.cc=$(OBJ_DIR)/%.o)
 
 # Flags
 CPPFLAGS := $(INCLUDE_DIRS) -D_LINUX
-CXXFLAGS := -Wall -O2
-CFLAGS   := -Wall -O2
+# turn off optimatization entirely for debugging:
+#CXXFLAGS := -Wall -O0 -g
+#CFLAGS   := -Wall -O0 -g
+# petalinux optimization level is O2:
+CXXFLAGS := -Wall -O2 -g
+CFLAGS   := -Wall -O2 -g
+
 #LDLIBS   := $(LIB_DIR)/$(LIB_NAME) -lzmq -lstdc++
 LDLIBS   := -lzmq -lstdc++
 
@@ -66,6 +71,11 @@ APP_OBJS := $(addprefix $(OBJ_DIR)/,$(addsuffix .o,$(APPS)))
 $(OBJ_DIR)/%.o: $(SRC_DIR)/apps/%/main.cc
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+# or from its main.c (pacman_fwcheck:  shared with the bare-metal build)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/apps/%/main.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 # link each ELF
 $(BIN_DIR)/%.elf: $(OBJ_DIR)/%.o $(LIB_DIR)/$(LIB_NAME)

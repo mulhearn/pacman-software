@@ -7,23 +7,38 @@
 #include <unistd.h>
 #include <cstring>
 
-#include "version.hh"
+#include "version.h"
 #include "addr_conf.hh"
 #include "pacman.hh"
 #include "tx_buffer.hh"
-#include "rx_buffer.hh"
-#include "pacman_i2c.hh"
 
 // new common drivers:
 #include "hw_access.h"
 #include "dma.h"
 #include "rxtx.h"
+#include "iic.h"
+#include "atc.h"
+#include "global.h"
+
+static unsigned count_rx = 0;
+static unsigned max_rx_pending = 0;
+
+unsigned pacman_packet_count_rx(int clear){
+  unsigned tmp = count_rx;
+  if (clear)
+    count_rx = 0;
+  return tmp;
+}
+
+unsigned pacman_max_rx_pending(int clear){
+  unsigned tmp = max_rx_pending;
+  if (clear)
+    max_rx_pending = 0;
+  return tmp;
+}
 
 volatile uint32_t * G_PACMAN_AXIL = NULL;
 
-//PACMAN SERVER Scratch Registers (Accessible at PACMAN_SERVER_VIRTUAL_START + (0, 1)
-uint32_t G_PACMAN_SERVER_SCRA = 0x0;
-uint32_t G_PACMAN_SERVER_SCRB = 0x0;
 
 int pacman_init(int verbose){
   // initialize axi-lite
@@ -31,79 +46,51 @@ int pacman_init(int verbose){
     printf("INFO:  Initializing PACMAN AXI-Lite interface.\n");
   }
 
-  int dh = open("/dev/mem", O_RDWR|O_SYNC);
-  G_PACMAN_AXIL = (uint32_t*)mmap(NULL, PACMAN_AXIL_LEN, PROT_READ|PROT_WRITE, MAP_SHARED, dh, PACMAN_AXIL_ADDR);
+  axil_platform_init();
+  timing_platform_init();
 
-
-  unsigned fwmajor = G_PACMAN_AXIL[0XFF10>>2];
-  unsigned fwminor = G_PACMAN_AXIL[0XFF14>>2];
-  unsigned fwpatch = G_PACMAN_AXIL[0XFF18>>2];
+  global_status_t gs;
+  get_global_status(&gs);
 
   if (verbose){
-    printf("INFO:  Running pacman-server version %d.%d.%d\n",
-	   PACMAN_SERVER_MAJOR_VERSION, PACMAN_SERVER_MINOR_VERSION, PACMAN_SERVER_PATCH_VERSION);
-    printf("INFO:  Running pacman firmware version %d.%d.%d\n", fwmajor, fwminor, fwpatch);
+    char software[48];
+    get_software_version_string(software, sizeof(software));
+    printf("INFO:  Running pacman software version %s\n", software);
+    printf("INFO:  Running pacman firmware version %u.%u.%u\n",
+	   (unsigned) gs.firmware_major, (unsigned) gs.firmware_minor, (unsigned) gs.firmware_patch);
   }
 
-  // I2C
+  // initialize I2C, for the hardware version the firmware was built for:
   if (verbose){
-    printf("INFO:  Initializing PACMAN I2C interface.\n");
+    printf("INFO:  Initializing PACMAN I2C interface for PACMAN %uv%u\n",
+	   (unsigned) gs.hardware_major, (unsigned) gs.hardware_minor);
   }
-  if (! (i2c_open()==EXIT_SUCCESS)){
-    printf("ERROR:  Could not open PACMAN I2C interface...\n");
-  }
-  unsigned i2cmajor = i2c_read(0x220);
-  unsigned i2cminor = i2c_read(0x221);
-  unsigned i2cdebug = i2c_read(0x222);
-
-  // I2C
-  if (verbose){
-    printf("INFO:  Running I2C firmware version %d.%d (Debug Code:  0x%x)\n", i2cmajor, i2cminor, i2cdebug);
-  }
+  iic_platform_init();
+  iic_set_hw_version(gs.hardware_major, gs.hardware_minor, gs.hardware_patch);
 
   // DEFAULT parameters
   if (verbose){
-    printf("INFO:  Setting number of cycles per DMA package to 31 (0x1F) as appropriate for DMA buffer length.\n");
+    printf("INFO:  Setting minimum DMA packet size to 0x3900 and packet timeout to 1 ms\n");
     printf("INFO:  Enabling Trigger, Sync, and Heartbeat words in the RX unit.\n");
   }
-  G_PACMAN_AXIL[0x7FB4>>2] = 0x001F;
-  G_PACMAN_AXIL[0x7FB8>>2] = 0x0003;
+  rx_set_buffer_config(RX_BUFFER_CONFIG_DAQ);
+  axil_write_register(0x7FB8, 0x0003);
 
   if (verbose){
-    printf("INFO:  Setting RX clock scale factor to 1 \n");
+    printf("INFO:  Configuring RX UARTs. \n");
   }
-  G_PACMAN_AXIL[0x7B04>>2] = 0x00001001;
+  rx_set_config_all(RX_CONFIG_DEFAULT);
 
   if (verbose){
-    printf("INFO:  Limiting TX bandwidth, with clock scale factor 1 \n");
+    printf("INFO:  Limiting TX bandwidth\n");
   }
-  // G_PACMAN_AXIL[0x3B04>>2] = 0x05281602;
-  G_PACMAN_AXIL[0x3B04>>2] = 0x07BC1601;
+  axil_write_register(0x3B04, 0x00C60006);
 
-  //polarity configuration: 0xE108
-  // 0x0HHHGGGI H=H output mask(10 bits) G=G output mask (10 bits) I = input mask (2 bits)
-  G_PACMAN_AXIL[0xE108>>2] = 0x03FF3FF0;
+  if (verbose){
+    printf("INFO:  Setting ASIC Timing and Control unit to default configuration. \n");
+  }
+  set_atc_default_config();
 
-  //destination configurations:
-  // 0x0MMMDDDO M=tile enables, D=duration O=output enables (1 = G, 2 = H, 4 = T)
-  //LEMO A destination configuration:  This is a SYNC pulse, H+T, duration 5
-  G_PACMAN_AXIL[0xE110>>2] = 0x03FF0056;
-  //LEMO B destination configuration:  This is a SYNC pulse, H+T, duration 5
-  G_PACMAN_AXIL[0xE114>>2] = 0x03FF0056;
-
-  //POKE C destination configuration:  This is an INTERNAL_RESET pulse, G, duration 24
-  G_PACMAN_AXIL[0xE118>>2] = 0x03FF0181;
-  //POKE D destination configuration:  This is a FULL_RESET pulse, G, duration 1024
-  G_PACMAN_AXIL[0xE11C>>2] = 0x03FF4001;
-
-  //POKE D destination configuration:  This is a SYNC pulse, H+T, duration 2
-  //G_PACMAN_AXIL[0xE11C>>2] = 0x03FF0056;
-
-  //Request ATC configuration update:
-  G_PACMAN_AXIL[0xE100>>2] = 0x0;
-
-  // duplicate (harmless) effort here while merging new driver code into PACMAN server.
-  axil_platform_init();
 
   return EXIT_SUCCESS;
 }
@@ -138,38 +125,36 @@ int pacman_init_rx(int verbose, int skip_reset){
   return EXIT_SUCCESS;
 }
 
-int pacman_poll_rx(){
+void pacman_poll_rx(pacman_word_t * buffer, unsigned * index, unsigned max){
   const unsigned rx_trailer_bytes = 24; // current firmware, each DMA RX packet has a 192-bit trailer
-  const unsigned batch_size = 100;
-  unsigned batch_count = 0;
   hw_addr_t nxta;
-  uint32_t rx_data[6];
 
-  while((batch_count < batch_size) && dma_next_available_rx_bd(&nxta)){
-    // several checks are possible here: xbytes size makes sense, trailer matches, etc...
-    // but keeping as simple as possible for integration of new driver ...
+  // track maximum of rx buffers pending:
+  unsigned pending = rx_pending();
+  if (pending > max_rx_pending)
+    max_rx_pending = pending;
+
+  while (1) {
+    // check that there is enough space for a maximially filled DMA buffer:
+    const unsigned max_words_per_bd = (RX_BUF_BYTES - rx_trailer_bytes) / 24;
+    if ((max - *index) < max_words_per_bd)
+      return;
+
+    if (!dma_next_available_rx_bd(&nxta))
+      return;
+
     unsigned xbytes = dma_poll_bd_transferred(nxta);
     hw_ptr_t rx_buf = dma_get_buffer(nxta);
-    if (xbytes > rx_trailer_bytes) {
-      unsigned full_words = (xbytes - rx_trailer_bytes) / 24;
-      for (unsigned i=0; i<full_words; i++){
-	rx_data[0] = rx_buf[6*i+0];
-	rx_data[1] = rx_buf[6*i+1];
-	rx_data[2] = rx_buf[6*i+2];
-	rx_data[3] = rx_buf[6*i+3];
-	rx_data[4] = rx_buf[6*i+4];
-	rx_data[5] = rx_buf[6*i+5];
-	rx_buffer_in(rx_data);
-      }
-    }
-    batch_count++;
+
+    assert(xbytes > rx_trailer_bytes);
+    assert((xbytes - rx_trailer_bytes) % 24 == 0);
+    unsigned packets = (xbytes - rx_trailer_bytes) / 24;
+    count_rx += packets;
+    memcpy(&buffer[*index], (void*)rx_buf, xbytes - rx_trailer_bytes);
+    *index += packets;
     dma_add_rx_bd(nxta);
-  }
-  if (batch_count > 0){
-    printf("INFO:  returning %d RX buffers \r\n", batch_count);
     dma_rx_batch();
   }
-  return EXIT_SUCCESS;
 }
 
 int pacman_poll_tx(){
@@ -199,16 +184,5 @@ int pacman_poll_tx(){
   return EXIT_SUCCESS;
 }
 
-int pacman_write(uint32_t addr, uint32_t value){
-  printf("DEBUG:  writing HW address 0x%x\n", addr);
-  G_PACMAN_AXIL[addr>>2] = value;
-  return EXIT_SUCCESS;
-}
-
-uint32_t pacman_read(uint32_t addr, int * status){
-  if (status)
-    *status = EXIT_SUCCESS;
-  return G_PACMAN_AXIL[addr>>2];
-}
 
 #endif
