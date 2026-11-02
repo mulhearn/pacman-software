@@ -243,6 +243,8 @@ void hwcheck_toggle_tile_mask(){
     0x0FF,   // tiles 1-8 (hw1v4)
     0x003,   // the loopback test card (bench 1v5)
     0x018,   // the ATC test card (bench 1v5)
+    0x060,   // the loopback test card on tiles 6 and 7 (bench 1v5)
+    0x100,   // the ATC test card on tile 9 (bench 1v5)
   };
   static int mode = 0;
   mode = (mode + 1) % (int) (sizeof(presets) / sizeof(presets[0]));

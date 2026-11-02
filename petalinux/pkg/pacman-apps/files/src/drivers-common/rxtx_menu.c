@@ -70,6 +70,7 @@ void rxtx_toggle_uart_mask(void){
     {0,     0x1, "UART 1"},
     {0x001, 0,   "tile 1 (UARTs 1-4)"},
     {0x006, 0,   "tiles 2 and 3 (UARTs 5-12)"},
+    {0x060, 0,   "tiles 6 and 7 (UARTs 21-28)"},
   };
   static int mode = 0;
   mode = (mode + 1) % (int) (sizeof(presets) / sizeof(presets[0]));
