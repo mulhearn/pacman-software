@@ -16,10 +16,13 @@ SRC_URI = " \
    file://pylib \
    file://utils \
    file://tests \
+   file://etc \
 "
 
 S = "${WORKDIR}"
 homedir = "/home/root"
+
+inherit python3-dir
 
 #inherit update-rc.d
 
@@ -43,6 +46,9 @@ do_install() {
 	# Install pylib
 	install -d ${D}${homedir}/pylib
 	install -m 0755 ${S}/pylib/* ${D}${homedir}/pylib/
+	# pylib on Python's path in every context (login, ssh commands, services)
+	install -d ${D}${PYTHON_SITEPACKAGES_DIR}
+	echo "${homedir}/pylib" > ${D}${PYTHON_SITEPACKAGES_DIR}/pacman.pth
 
 	# Install utility scripts
 	install -d ${D}${homedir}/utils
@@ -56,6 +62,9 @@ do_install() {
 	install -d ${D}${sysconfdir}/init.d
 	install -m 0755 ${S}/utils/pacman_server.sh ${D}${sysconfdir}/init.d/pacman_server
 	install -m 0755 ${S}/utils/pacman_gpio_init.sh ${D}${sysconfdir}/init.d/pacman_gpio_init
+	# sshd settings
+	install -d ${D}${sysconfdir}/ssh/sshd_config.d
+	install -m 0644 ${S}/etc/sshd_config.d/pacman.conf ${D}${sysconfdir}/ssh/sshd_config.d/
 	# expected by legacy users here as well:
 	install -m 0755 ${S}/utils/pacman_server.sh ${D}${bindir}/pacman_server
 	# embedded-Linux checkout of the Trenz module:
@@ -78,6 +87,7 @@ pkg_postinst_ontarget:${PN} () {
 
 FILES:${PN} += "${sysconfdir}/*"
 FILES:${PN} += "${homedir}/pylib/*"
+FILES:${PN} += "${PYTHON_SITEPACKAGES_DIR}/pacman.pth"
 FILES:${PN} += "${homedir}/utils/*"
 FILES:${PN} += "${homedir}/tests/*"
 FILES:${PN} += "${bindir}/*"

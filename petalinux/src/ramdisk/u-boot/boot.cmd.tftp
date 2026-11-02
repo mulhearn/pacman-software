@@ -14,5 +14,8 @@ if tftpboot 0x10000000 system.bit; then
 else
 	echo "PACMAN TFTP boot: no system.bit on the server, keeping the firmware from BOOT.BIN"
 fi
+# Keep the ramdisk and device tree below the 256 MB DMA buffer at 0x20000000
+setenv initrd_high 0x20000000
+setenv fdt_high 0x20000000
 tftpboot 0x10000000 image.ub && bootm 0x10000000
 echo "PACMAN TFTP boot failed"

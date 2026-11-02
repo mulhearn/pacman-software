@@ -1,0 +1,10 @@
+Site overlay:  copy this directory to petalinux/site (untracked, private:  it may hold secrets) and fill it in.
+Both in-place images (ramdisk, full) apply it after their packages are installed;  a clone without petalinux/site
+builds the images as released.  The build log names every file applied, with its checksum.
+
+  rootfs/     a tree copied over the image's root as is (owner root, modes kept), e.g.
+                home/root/.ssh/authorized_keys   ssh keys for root
+                home/root/HELLO.txt
+  post.sh     optional, run after the copy as  sh post.sh <image root> <site directory>,  for edits to files the
+              image's packages own, e.g. root's password hash in etc/shadow (see post.sh here)
+  root.hash   for that example:  one line, a hash from  openssl passwd -6  (never the password itself)

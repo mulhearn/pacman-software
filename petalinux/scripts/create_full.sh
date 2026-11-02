@@ -40,3 +40,7 @@ cp -v $SRC/$SPEC/config            $PROJ/project-spec/configs/config
 # add PACMAN software package:
 ln -sfn  ../../../../$PKG/pacman-apps $PROJ/project-spec/meta-user/recipes-apps/
 
+# site overlay (applies petalinux/site when present):
+mkdir -p $PROJ/project-spec/meta-user/recipes-core
+ln -sfn  ../../../../$PKG/pacman-site $PROJ/project-spec/meta-user/recipes-core/
+
