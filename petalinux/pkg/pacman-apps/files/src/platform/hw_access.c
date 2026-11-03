@@ -613,7 +613,7 @@ void bram_platform_init() {
         return;
     }
 
-    printf("INFO: BRAM platform initialized (0x%X bytes at 0x%X)\n", PACMAN_BRAM_LEN, PACMAN_BRAM_ADDR);
+    printf("INFO:  BRAM platform initialized (0x%X bytes at 0x%X)\n", PACMAN_BRAM_LEN, PACMAN_BRAM_ADDR);
 }
 
 void bram_platform_close() {

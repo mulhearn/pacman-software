@@ -107,7 +107,6 @@ int main(int argc, char* argv[]){
   static pacman_msg_t rep_msg;
   static pacman_msg_t req_msg;
 
-  printf("DEBUG:  cycle 4\n");
   while (1) {
     pacman_poll_tx();
 

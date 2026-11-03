@@ -737,12 +737,12 @@ static hw_addr_t G_BATCH_TX_TAILDESC_ADDR = 0;
 static hw_addr_t G_BATCH_RX_TAILDESC_ADDR = 0;
 
 void dma_init_batch_tx_taildesc(hw_addr_t addr){
-  printf("INFO:  setting address of TX batch tail field to 0x%08X \r\n", (unsigned int) addr);
+  printf("INFO:  Setting address of TX batch tail field to 0x%08X\r\n", (unsigned int) addr);
   G_BATCH_TX_TAILDESC_ADDR = addr;
 }
 
 void dma_init_batch_rx_taildesc(hw_addr_t addr){
-  printf("INFO:  setting address of RX batch tail field to 0x%08X \r\n", (unsigned int) addr);
+  printf("INFO:  Setting address of RX batch tail field to 0x%08X\r\n", (unsigned int) addr);
   G_BATCH_RX_TAILDESC_ADDR = addr;
 }
 
