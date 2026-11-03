@@ -1,0 +1,7 @@
+the_ROM_image:
+{
+	[bootloader] ./pacman_fsbl.elf
+	./pacman.bit
+	./u-boot.elf
+	[load=0x00100000] ./system.dtb
+}
