@@ -1,12 +1,20 @@
-# disable all tiles and then power off
-PACMAN_UTIL=/home/root/pacman_util.py
+#!/bin/sh
+#
+# Disable all tiles, turn off tile power and set every tile's DACs to 0, through the
+# pacman_cmdserver.
+#
+# usage:
+#   power_down.sh
+#
 
-TILE_EN_ADDR=0x00000010
-TILE_EN_VALUE=0b00000000 # disable all tiles
+PACMAN_UTIL=/home/root/utils/pacman_util.py
 
-ANALOG_PWR_EN_ADDR=0x00000014
-ANALOG_PWR_EN_VALUE=0 # disable larpix power
+DACS=""
+for T in 0 1 2 3 4 5 6 7 8 9; do
+    DACS="$DACS --write $((0x00200010 + T)) 0 --write $((0x00200020 + T)) 0"
+done
 
 $PACMAN_UTIL \
-    --write $TILE_EN_ADDR $TILE_EN_VALUE \
-    --write $ANALOG_PWR_EN_ADDR $ANALOG_PWR_EN_VALUE
+    --write 0x001002F0 0 \
+    --write 0x00100110 0 \
+    $DACS > /dev/null

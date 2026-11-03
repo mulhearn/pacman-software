@@ -1,27 +1,28 @@
-# sets nominal voltages on a tile and then powers on
-# usage:
-#   source power_up_tile.sh <tile number 1-10>
+#!/bin/sh
 #
-TILE=$1
+# Power up one tile at the nominal ASIC voltages, through the pacman_cmdserver (as the power
+# submenu of pacman_menu).
+#
+# usage:
+#   power_up_tile.sh <tile 1-10>
+#
 
 PACMAN_UTIL=/home/root/utils/pacman_util.py
 
-# DAC values:
-VDDD_DAC_VALUE=28000
-VDDA_DAC_VALUE=58000
+# Nominal DAC codes (as pacman_menu)
+VDDA_DN=0xE2FF
+VDDD_DN=0x75FF
 
-# Address for this TILE
-VDDA_DAC_WRITE_ADDR=$(( 0x24010 + $TILE-1 ))
-VDDD_DAC_WRITE_ADDR=$(( 0x24020 + $TILE-1 ))
+TILE=$1
+case "$TILE" in
+  [1-9]|10) ;;
+  *) echo "usage:  power_up_tile.sh <tile 1-10>"; return 1 2> /dev/null || exit 1 ;;
+esac
+T=$((TILE - 1))
 
-# Write DAC registers
+# DACs, then tile power, then the tile
 $PACMAN_UTIL \
-    --write $VDDA_DAC_WRITE_ADDR $VDDA_DAC_VALUE \
-    --write $VDDD_DAC_WRITE_ADDR $VDDD_DAC_VALUE
-
-# enable tile power (global enable):
-$PACMAN_UTIL  --string enable_tile_power
-
-# set enable for this tile:
-CMD="enable_tile tile="$TILE
-$PACMAN_UTIL  --string "$CMD"
+    --write $((0x00200010 + T)) $VDDA_DN \
+    --write $((0x00200020 + T)) $VDDD_DN \
+    --write 0x00100114 0 \
+    --write 0x00100214 $T > /dev/null

@@ -1,43 +1,29 @@
-# checks VDDD/VDDA ADCs
-# usage:
-#    source report_power.sh
+#!/bin/sh
 #
-#PACMAN_UTIL=/home/root/pacman_util.py
-PACMAN_UTIL=./pacman_util.py
+# Report each tile's VDDA and VDDD voltage and current, through the pacman_cmdserver.
+#
+# usage:
+#   report_power.sh
+#
 
-READ_VDDA=0x24030 # base address to read ADC for VDDA
-READ_VDDD=0x24040 # base address to read ADC for VDDA
-READ_IDDA=0x24050 # base address to read ADC for IDDA
-READ_IDDD=0x24060 # base address to read ADC for IDDA
+PACMAN_UTIL=/home/root/utils/pacman_util.py
 
-for TILE in $(seq 1 10); do
-    #echo $TILE
-    REG_VDDA=$(( $READ_VDDA + $TILE - 1 ))
-    REG_VDDD=$(( $READ_VDDD + $TILE - 1 ))
-    REG_IDDA=$(( $READ_IDDA + $TILE - 1 ))
-    REG_IDDD=$(( $READ_IDDD + $TILE - 1 ))
-
-    python -c "print(\"TILE ${TILE}:\")"
-
-    # EXAMPLE READ_RESPONSE:
-    #READ_RESP="'READ' | '0x24031' | '0x578'"
-    
-    READ_RESP=$($PACMAN_UTIL --read $REG_VDDA | grep 'READ')
-    python -c "adc=int(\"\"\"${READ_RESP}\"\"\".split()[-1].split('x')[-1].strip('\'L'),16); print('VDDA: %.0f mV ' % adc);"
-
-    READ_RESP=$($PACMAN_UTIL --read $REG_VDDD | grep 'READ')
-    python -c "adc=int(\"\"\"${READ_RESP}\"\"\".split()[-1].split('x')[-1].strip('\'L'),16); print('VDDD: %.0f mV ' % adc);"
-
-    READ_RESP=$($PACMAN_UTIL --read $REG_IDDA | grep 'READ')
-    python -c "adc=int(\"\"\"${READ_RESP}\"\"\".split()[-1].split('x')[-1].strip('\'L'),16); print('VDDA: %.0f mA ' % adc);"
-
-    READ_RESP=$($PACMAN_UTIL --read $REG_IDDD | grep 'READ')
-    python -c "adc=int(\"\"\"${READ_RESP}\"\"\".split()[-1].split('x')[-1].strip('\'L'),16); print('VDDD: %.0f mA ' % adc);"
-
+READS=""
+for T in 0 1 2 3 4 5 6 7 8 9; do
+    for OFF in 0x30 0x40 0x50 0x60; do
+        READS="$READS --read $((0x00200000 + OFF + T))"
+    done
 done
-    
 
-
-        
-
-
+# Values from the reply, in the order requested
+$PACMAN_UTIL $READS | awk '
+  /msg_type: REP/ { rep = 1; next }
+  rep && /READ:/  { v[n++] = $NF }
+  END {
+    for (t = 0; t < 10; t++) {
+      gsub(/[()]/, "", v[4*t]); gsub(/[()]/, "", v[4*t+1])
+      gsub(/[()]/, "", v[4*t+2]); gsub(/[()]/, "", v[4*t+3])
+      printf("TILE %2d:  VDDA %5d mV %5d mA   VDDD %5d mV %5d mA\n",
+             t + 1, v[4*t], v[4*t+2], v[4*t+1], v[4*t+3])
+    }
+  }'
