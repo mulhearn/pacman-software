@@ -51,6 +51,17 @@ pkill -9 -f eclipse
 xsct apps/pacman_fsbl/install.tcl
 ls -alh products/pacman_fsbl.elf
 
+# USAGE NOTE: (ACLs)
+# If the repository sits in a directory with default ACLs, remove them from the project and from
+# pkg/ (which the project links to), or do_unpack fails with "cp: preserving permissions ...:
+# Invalid argument".  After create_full.sh below, from petalinux/, do:
+setfacl -R -b -k full pkg
+# and similar for ramdisk.
+
+# SHARED CACHE (optional):  a read-only download premirror and sstate mirror at petalinux/cache speed up a new
+# project's first build.  On felix, from petalinux/:
+ln -s /tools/petalinux-cache/2023.2 cache
+
 #petalinux:
 source /tools/Xilinx/PetaLinux/2023.2/tool/settings.sh
 cd petalinux

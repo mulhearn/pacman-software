@@ -36,6 +36,7 @@ cp -v $SRC/$SPEC/system-user.dtsi  $PROJ/project-spec/meta-user/recipes-bsp/devi
 cp -v $SRC/$SPEC/user-rootfsconfig $PROJ/project-spec/meta-user/conf/
 cp -v $SRC/$SPEC/rootfs_config     $PROJ/project-spec/configs/rootfs_config
 cp -v $SRC/$SPEC/config            $PROJ/project-spec/configs/config
+cat $SRC/common/petalinuxbsp.conf >> $PROJ/project-spec/meta-user/conf/petalinuxbsp.conf
 cp -v $SRC/common/bsp.cfg          $PROJ/project-spec/meta-user/recipes-bsp/u-boot/files/bsp.cfg
 
 # add PACMAN software package:
