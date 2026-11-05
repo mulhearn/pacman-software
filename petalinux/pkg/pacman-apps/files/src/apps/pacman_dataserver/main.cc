@@ -16,7 +16,7 @@
 #define PUB_SOCKET_BINDING "tcp://*:5556"
 
 // Fire and forget setting:
-const int PUB_HWM     = 1;    // high-water mark
+const int PUB_HWM     = 1000; // high-water mark
 const int PUB_LINGER  = 0;    // drop unsent messages at close
 const int PUB_SNDTIMEO = 0;   // send timeout in ms
 
