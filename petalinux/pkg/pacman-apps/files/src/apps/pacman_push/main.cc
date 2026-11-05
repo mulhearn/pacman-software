@@ -10,7 +10,7 @@
 
 #include "pacman_message.hh"
 
-#define SOCKET_A_BINDING_REQ "tcp://localhost:5555"
+#define SOCKET_A_FORMAT_REQ "tcp://%s:5555"  // Command server at the PACMAN address
 
 int main(int argc, char* argv[]) {
     // Default parameters
@@ -19,17 +19,19 @@ int main(int argc, char* argv[]) {
     unsigned n_tx     = 1000;
     unsigned delay_us = 132;
     unsigned chan     = 0;
+    const char * ip   = "localhost";
 
     int opt;
-    while ((opt = getopt(argc, argv, "v:w:n:d:c:")) != -1) {
+    while ((opt = getopt(argc, argv, "v:w:n:d:c:i:")) != -1) {
         switch(opt) {
             case 'v': verbose   = std::atoi(optarg); break;
             case 'w': nwords    = std::atoi(optarg); break;
             case 'n': n_tx      = std::atoi(optarg); break;
             case 'd': delay_us  = std::atoi(optarg); break;
 	    case 'c': chan      = std::atoi(optarg); break;
+            case 'i': ip        = optarg; break;
             default:
-                printf("Usage: %s [-v verbose] [-w nwords] [-n n_tx] [-d delay_us] [-c chan]\n", argv[0]);
+                printf("Usage: %s [-v verbose] [-w nwords] [-n n_tx] [-d delay_us] [-c chan] [-i ip]\n", argv[0]);
                 return 1;
         }
     }
@@ -60,8 +62,10 @@ int main(int argc, char* argv[]) {
     zmq_setsockopt(req, ZMQ_SNDTIMEO, &param, sizeof(param));
     zmq_setsockopt(req, ZMQ_RCVTIMEO, &param, sizeof(param));
 
-    if (zmq_connect(req, SOCKET_A_BINDING_REQ) != 0) {
-        printf("ERROR: Failed to connect socket (%s)!\n", SOCKET_A_BINDING_REQ);
+    char endpoint[128];
+    snprintf(endpoint, sizeof(endpoint), SOCKET_A_FORMAT_REQ, ip);
+    if (zmq_connect(req, endpoint) != 0) {
+        printf("ERROR: Failed to connect socket (%s)!\n", endpoint);
         return 1;
     }
     printf("INFO: ZMQ REQ socket connected successfully...\n");

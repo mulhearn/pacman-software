@@ -6,11 +6,12 @@
 #include <cassert>
 #include <sys/time.h>
 #include <signal.h>
+#include <getopt.h>
 
 #include "pacman_message.hh"
 
 #define REPORT_INTERVAL_MS 10000
-#define SOCKET_B_BINDING_SUB "tcp://localhost:5556"
+#define SOCKET_B_FORMAT_SUB "tcp://%s:5556"  // Data server at the PACMAN address
 #define MAX_CHANNEL 40
 
 // NOTE: this needs to be synchronized with MAX_PAYLOAD of pacman_dataserver,
@@ -77,6 +78,17 @@ static void print_report(double cumulative_ms, double window_ms){
 }
 
 int main(int argc, char* argv[]){
+  const char * ip = "localhost";
+  int opt;
+  while ((opt = getopt(argc, argv, "i:")) != -1){
+    switch(opt){
+    case 'i': ip = optarg; break;
+    default:
+      printf("Usage: %s [-i ip]\n", argv[0]);
+      return 1;
+    }
+  }
+
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
 
@@ -97,8 +109,10 @@ int main(int argc, char* argv[]){
   zmq_setsockopt(sub, ZMQ_RCVTIMEO, &iparam, sizeof(iparam));
   zmq_setsockopt(sub, ZMQ_SUBSCRIBE, "", 0);
 
-  if (zmq_connect(sub, SOCKET_B_BINDING_SUB) !=0 ) {
-    printf("ERROR:  Failed to connect socket (%s)!\n", SOCKET_B_BINDING_SUB);
+  char endpoint[128];
+  snprintf(endpoint, sizeof(endpoint), SOCKET_B_FORMAT_SUB, ip);
+  if (zmq_connect(sub, endpoint) !=0 ) {
+    printf("ERROR:  Failed to connect socket (%s)!\n", endpoint);
     return 1;
   }
   printf("INFO:  ZQM SUB socket (B) connected successfully...\n");
