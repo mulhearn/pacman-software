@@ -102,6 +102,8 @@ int main(int argc, char* argv[]) {
 
   uint64_t rcvd_packets_window   = 0;
   uint64_t rcvd_packets_total    = 0;
+  uint64_t incomplete_window     = 0;
+  uint64_t incomplete_total      = 0;
   uint64_t sent_packets_window   = 0;
   uint64_t sent_packets_total    = 0;
   uint64_t sent_messages_window  = 0;
@@ -121,6 +123,8 @@ int main(int argc, char* argv[]) {
       double cumulative_ms = 1000.0*(now_tv.tv_sec - report_start.tv_sec) + (now_tv.tv_usec - report_start.tv_usec)/1000.0;
       rcvd_packets_window = pacman_packet_count_rx(1);
       rcvd_packets_total += rcvd_packets_window;
+      incomplete_window = pacman_rx_incomplete_packets(1);
+      incomplete_total += incomplete_window;
 
       printf("INFO:  --- Report @ cumulative: %.1f ms  current interval: %.1f ms ---\n", cumulative_ms, window_ms);
       printf(" max rx pending:  %u \n",  pacman_max_rx_pending());
@@ -133,6 +137,7 @@ int main(int argc, char* argv[]) {
       printf("sent packets:        %12llu (total:  %12llu) ---> rate: %12.4f \n",
              sent_packets_window, sent_packets_total, sent_packets_window/window_ms);
       printf("sent messages:       %12llu (total:  %12llu) \n", sent_messages_window, sent_messages_total);
+      printf("incomplete packets:  %12llu (total:  %12llu) \n", incomplete_window, incomplete_total);
       printf("session:  0x%08x  next seq:  %u\n", session, seq);
       stall_time_window     = 0;
       idle_time_window     = 0;

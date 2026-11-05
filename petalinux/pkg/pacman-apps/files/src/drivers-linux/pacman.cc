@@ -22,6 +22,18 @@
 
 static unsigned count_rx = 0;
 static unsigned max_rx_pending = 0;
+static unsigned rx_incomplete_packets = 0;
+
+// rx_whole_packet:  true if an RX transfer is a whole packet:  words, then a trailer counting them
+// (32-bit words:  EOP header, 0, word count, 0, 0, 0)
+static bool rx_whole_packet(hw_ptr_t buf, unsigned xbytes, unsigned trailer_bytes){
+  if ((xbytes <= trailer_bytes) || ((xbytes - trailer_bytes) % 24 != 0))
+    return false;
+  unsigned words = (xbytes - trailer_bytes) / 24;
+  hw_ptr_t trailer = buf + (xbytes - trailer_bytes) / 4;
+  return (trailer[1] == 0) && (trailer[2] == words) && (trailer[3] == 0) && (trailer[4] == 0)
+    && (trailer[5] == 0);
+}
 
 unsigned pacman_packet_count_rx(int clear){
   unsigned tmp = count_rx;
@@ -34,6 +46,13 @@ unsigned pacman_max_rx_pending(int clear){
   unsigned tmp = max_rx_pending;
   if (clear)
     max_rx_pending = 0;
+  return tmp;
+}
+
+unsigned pacman_rx_incomplete_packets(int clear){
+  unsigned tmp = rx_incomplete_packets;
+  if (clear)
+    rx_incomplete_packets = 0;
   return tmp;
 }
 
@@ -146,8 +165,14 @@ void pacman_poll_rx(pacman_word_t * buffer, unsigned * index, unsigned max){
     unsigned xbytes = dma_poll_bd_transferred(nxta);
     hw_ptr_t rx_buf = dma_get_buffer(nxta);
 
-    assert(xbytes > rx_trailer_bytes);
-    assert((xbytes - rx_trailer_bytes) % 24 == 0);
+    // Incomplete packet (cut short by a DMA reset):  discard it
+    if (!rx_whole_packet(rx_buf, xbytes, rx_trailer_bytes)){
+      rx_incomplete_packets++;
+      printf("WARNING:  discarded an incomplete RX packet of %u bytes\n", xbytes);
+      dma_add_rx_bd(nxta);
+      dma_rx_batch();
+      continue;
+    }
     unsigned packets = (xbytes - rx_trailer_bytes) / 24;
     count_rx += packets;
     memcpy(&buffer[*index], (void*)rx_buf, xbytes - rx_trailer_bytes);
