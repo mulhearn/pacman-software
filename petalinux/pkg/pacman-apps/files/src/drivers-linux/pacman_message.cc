@@ -80,7 +80,8 @@ bool check_msg(const pacman_msg_t* msg) {
 
 void print_header(const pacman_header_t* header, const char * prefix = "") {
   printf("version %d.%d n_bytes: %d ",header->version_major, header->version_minor, header->n_bytes);
-  printf("timestamp:  0x%08x%08x \n", header->timestamp_hi, header->timestamp_lo);
+  printf("timestamp:  0x%08x%08x ", header->timestamp_hi, header->timestamp_lo);
+  printf("seq:  %u session:  0x%08x \n", header->seq, header->session);
 }
 
 void print_word(const pacman_word_t* word, const char * prefix = "") {

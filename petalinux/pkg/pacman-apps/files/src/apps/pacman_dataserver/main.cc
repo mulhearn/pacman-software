@@ -6,6 +6,7 @@
 #include <thread>
 #include <zmq.h>
 #include <sys/time.h>
+#include <sys/random.h>
 
 #include "pacman.hh"
 #include "pacman_message.hh"
@@ -61,6 +62,19 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
   printf("INFO: ZMQ socket bound successfully at %s\n", PUB_SOCKET_BINDING);
+
+  // Session:  random, never 0 (0 marks unnumbered messages)
+  uint32_t session = 0;
+  while (session == 0) {
+    if (getrandom(&session, sizeof(session), 0) != sizeof(session)) {
+      perror("ERROR: getrandom failed");
+      zmq_close(pub_socket);
+      zmq_ctx_term(ctx);
+      return EXIT_FAILURE;
+    }
+  }
+  uint32_t seq = 0;
+  printf("INFO: session 0x%08x\n", session);
 
   printf("INFO: Initializing PACMAN RX driver.\n");
   if (pacman_init_rx(1,1) == EXIT_FAILURE) {
@@ -119,6 +133,7 @@ int main(int argc, char* argv[]) {
       printf("sent packets:        %12llu (total:  %12llu) ---> rate: %12.4f \n",
              sent_packets_window, sent_packets_total, sent_packets_window/window_ms);
       printf("sent messages:       %12llu (total:  %12llu) \n", sent_messages_window, sent_messages_total);
+      printf("session:  0x%08x  next seq:  %u\n", session, seq);
       stall_time_window     = 0;
       idle_time_window     = 0;
       rcvd_packets_window  = 0;
@@ -165,6 +180,8 @@ int main(int argc, char* argv[]) {
       fill_index = 0;
 
       write_header_data((pacman_header_t*) msg_buffer, msg_packets * WORD_BYTES);
+      ((pacman_header_t*) msg_buffer)->seq     = seq++;
+      ((pacman_header_t*) msg_buffer)->session = session;
 
       msg_ready = false;
 

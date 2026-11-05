@@ -4,7 +4,7 @@
 #include <cstring>
 
 #define MSG_VERSION_MAJOR 1
-#define MSG_VERSION_MINOR 0
+#define MSG_VERSION_MINOR 1   // 1:  header seq and session (bytes 16-23)
 
 #define WORD_BYTES 24
 #define HEADER_BYTES 24
@@ -26,7 +26,8 @@ typedef struct {
   uint32_t n_bytes;       // 4–7
   uint32_t timestamp_lo;  // 8–11
   uint32_t timestamp_hi;  // 12–15
-  uint32_t _pad[2];       // 16–23
+  uint32_t seq;           // 16–19  DATA:  message count in this session, from 0 (wraps);  0 otherwise
+  uint32_t session;       // 20–23  DATA:  random at each data server start (restart:  new session);  0 otherwise
 } pacman_header_t;
 
 static_assert(sizeof(pacman_header_t) == HEADER_BYTES, "Header must be 24 bytes");

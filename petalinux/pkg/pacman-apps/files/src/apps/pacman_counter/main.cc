@@ -7,6 +7,8 @@
 #include <sys/time.h>
 #include <signal.h>
 
+#include "pacman_message.hh"
+
 #define REPORT_INTERVAL_MS 10000
 #define SOCKET_B_BINDING_SUB "tcp://localhost:5556"
 #define MAX_CHANNEL 40
@@ -20,22 +22,69 @@ uint32_t rx_buffer[MAX_BUFFER_SIZE/4];
 volatile bool running = true;
 void signal_handler(int) { running = false; }
 
+// Counts for the reports
+uint32_t packets[MAX_CHANNEL];
+uint64_t total_messages = 0;
+uint64_t total_packets = 0;
+uint64_t window_packets = 0;
+uint64_t total_errors = 0;
+uint32_t max_pkts_per_msg = 0;
+uint32_t min_pkts_per_msg = UINT32_MAX;
+
+// Message sequence:  lost messages and data server restarts
+bool     have_session = false;
+uint32_t session = 0;
+uint32_t last_seq = 0;
+uint64_t lost_messages = 0;
+uint64_t restarts = 0;
+uint64_t unnumbered = 0;
+
+// count_seq:  count the messages lost before this one, from its seq and session
+static void count_seq(const pacman_header_t * h){
+  if (h->session == 0){
+    unnumbered++;
+    return;
+  }
+  if (have_session && (h->session == session)){
+    lost_messages += (uint32_t) (h->seq - last_seq - 1);
+  } else if (have_session){
+    restarts++;
+    lost_messages += h->seq;
+  }
+  have_session = true;
+  session = h->session;
+  last_seq = h->seq;
+}
+
+// print_report:  the counts so far
+static void print_report(double cumulative_ms, double window_ms){
+  printf("INFO:  --- Report @ %.1f ms (interval: %.1f ms) ---\n", cumulative_ms, window_ms);
+  printf("  cumulative messages: %12llu\n", (unsigned long long) total_messages);
+  printf("  cumulative packets: %12llu rate: %12.2f / ms\n",
+         (unsigned long long) total_packets, total_packets/cumulative_ms);
+  printf("  interval packets: %12llu   rate: %12.2f / ms\n",
+         (unsigned long long) window_packets, window_packets/window_ms);
+  printf("  packets per message: min: %12u  max: %12u\n", min_pkts_per_msg, max_pkts_per_msg);
+  printf("  lost messages: %12llu  restarts: %llu  unnumbered: %llu  session: 0x%08x\n",
+         (unsigned long long) lost_messages, (unsigned long long) restarts,
+         (unsigned long long) unnumbered, session);
+  printf("  errors: %llu\n", (unsigned long long) total_errors);
+  printf("  channel counts:\n");
+  for (int i=0; i<MAX_CHANNEL; i++){
+    printf("%8d ", packets[i]);
+    if (((i+1)%8)==0) printf("\n");
+  }
+}
+
 int main(int argc, char* argv[]){
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
 
   // timers and counters:
   struct timeval start, window_start, now;
-  uint32_t packets[MAX_CHANNEL];
   for (int i=0; i<MAX_CHANNEL; i++){
     packets[i]=0;
   }
-  uint64_t total_messages = 0;
-  uint64_t total_packets = 0;
-  uint64_t window_packets = 0;
-  uint64_t total_errors = 0;
-  uint32_t max_pkts_per_msg = 0;
-  uint32_t min_pkts_per_msg = UINT32_MAX;
 
   int iparam;
   printf("INFO:  Starting ZMQ packet counter utility.\n");
@@ -62,16 +111,7 @@ int main(int argc, char* argv[]){
     double window_ms     = 1000.0*(now.tv_sec - window_start.tv_sec) + (now.tv_usec - window_start.tv_usec)/1000.0;
     if (window_ms >= REPORT_INTERVAL_MS) {
       double cumulative_ms = 1000.0*(now.tv_sec - start.tv_sec) + (now.tv_usec - start.tv_usec)/1000.0;
-
-      printf("INFO:  --- Report @ %.1f ms (interval: %.1f ms) ---\n", cumulative_ms, window_ms);
-      printf("  cumulative packets: %12lu rate: %12.2f / ms\n",  total_packets,  total_packets/cumulative_ms);
-      printf("  interval packets: %12lu   rate: %12.2f / ms\n",  window_packets, window_packets/window_ms);
-      printf("  packets per message: min: %12u  max: %12u\n", min_pkts_per_msg, max_pkts_per_msg);
-      printf("  channel counts:\n");
-      for (int i=0; i<MAX_CHANNEL; i++){
-	printf("%8d ", packets[i]);
-	if (((i+1)%8)==0) printf("\n");
-      }
+      print_report(cumulative_ms, window_ms);
       gettimeofday(&window_start, NULL);
       window_packets = 0;
     }
@@ -87,6 +127,7 @@ int main(int argc, char* argv[]){
     }
     if (size > MAX_BUFFER_SIZE){
       printf("ERROR:  unexpectedly large message:  %d ... (MAX: %d) discarding\n", size, MAX_BUFFER_SIZE);
+      zmq_msg_close(&msg);
       total_errors++;
       continue;
     }
@@ -108,6 +149,7 @@ int main(int argc, char* argv[]){
     //printf("DEBUG:  received valid message\n");
     unsigned npkts = (nbytes / 24);
     total_messages++;
+    count_seq((const pacman_header_t *) rx_buffer);
     if (npkts > max_pkts_per_msg) max_pkts_per_msg = npkts;
     if (npkts < min_pkts_per_msg) min_pkts_per_msg = npkts;
 
@@ -132,6 +174,13 @@ int main(int argc, char* argv[]){
       }
     }
   }
+
+  // Final report
+  gettimeofday(&now, NULL);
+  double window_ms     = 1000.0*(now.tv_sec - window_start.tv_sec) + (now.tv_usec - window_start.tv_usec)/1000.0;
+  double cumulative_ms = 1000.0*(now.tv_sec - start.tv_sec) + (now.tv_usec - start.tv_usec)/1000.0;
+  print_report(cumulative_ms, window_ms);
+
   zmq_close(sub);
   zmq_ctx_term(ctx);
   printf("INFO:  Shutting down.\n");
