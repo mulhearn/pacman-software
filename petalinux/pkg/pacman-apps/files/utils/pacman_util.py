@@ -244,7 +244,7 @@ if __name__ == '__main__':
     parser.add_argument('--tx', nargs=2, type=_int_parser,
                         action='append', metavar=('CHANNEL','WORD'),
                         help=('transmit a larpix message on a uart channel '
-                              '(channel 255 is broadcast, channel 0 is not used)'))
+                              '(channels 1-40;  others are refused)'))
     parser.add_argument('--rx', nargs=1, type=_int_parser,
                         action='append', metavar=('N'),
                         help='prints data server messages to stdout, for N negative, runs indefinitely')

@@ -58,8 +58,8 @@ void pacman_write(uint32_t addr, uint32_t value){
     // 0x001003F0:  DISABLE_ALL_UART_RX     DC/0     (WO)
     // 0x001003F4:  ENABLE_ALL_UART_RX      DC/0     (WO)
 
-    // 0x00100410:  SEND_FULL_RESET      <MASK>
-    // 0x00100420:  SEND_INTERNAL_RESET  <MASK>
+    // 0x00100410:  SEND_INTERNAL_RESET  <MASK>
+    // 0x00100420:  SEND_FULL_RESET      <MASK>
 
     switch(off){
 

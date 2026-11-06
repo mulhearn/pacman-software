@@ -47,12 +47,21 @@ void tx_buffer_print_output(uint32_t * src){
 }
 
 unsigned tx_buffer_count(unsigned char chan){
-  if (chan > TX_BUFFER_CHAN)
+  if (chan >= TX_BUFFER_CHAN)
     return 0;
   unsigned head = G_TX_BUFFER_HEAD[chan];
   unsigned tail = G_TX_BUFFER_TAIL[chan];
 
   return (TX_BUFFER_DEPTH + head - tail) % TX_BUFFER_DEPTH;
+}
+
+unsigned tx_buffer_free(unsigned char chan){
+  if (chan >= TX_BUFFER_CHAN)
+    return 0;
+  unsigned head = G_TX_BUFFER_HEAD[chan];
+  unsigned tail = G_TX_BUFFER_TAIL[chan];
+
+  return (TX_BUFFER_DEPTH + tail - head - 1) % TX_BUFFER_DEPTH;
 }
 
 unsigned tx_buffer_lost(){
@@ -62,23 +71,8 @@ unsigned tx_buffer_lost(){
 
 unsigned tx_buffer_in(unsigned char chan, uint32_t tx_data_hi, uint32_t tx_data_lo){
 
-  // check for broadcast:
-  if (chan >= TX_BUFFER_CHAN){
-    unsigned replay = 0;
-    if (chan == 63)
-      replay = 1;
-    else if (chan == 62)
-      replay = 2;
-    else
-      return 0;
-
-    for (unsigned i=0; i<replay; i++){
-      for (unsigned char c=0; c<TX_BUFFER_CHAN; c++){
-	tx_buffer_in(c, tx_data_hi, tx_data_lo);
-      }
-    }
-    return 1;
-  }
+  if (chan >= TX_BUFFER_CHAN)
+    return 0;
 
   unsigned head = G_TX_BUFFER_HEAD[chan];
   if (((head+1) % TX_BUFFER_DEPTH) == G_TX_BUFFER_TAIL[chan]){

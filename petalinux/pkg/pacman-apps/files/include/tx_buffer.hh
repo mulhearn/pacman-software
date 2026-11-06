@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define TX_BUFFER_BROADCAST 255
+// Channels are UARTs, zero-referenced (wire channel - 1).
 #define TX_BUFFER_CHAN      40
 #define TX_BUFFER_DEPTH     1024
 // number of 32 bit words in tx buffer output
@@ -20,6 +20,9 @@ unsigned tx_buffer_out(uint32_t * dst);
 void tx_buffer_print_output(uint32_t * src);
 
 unsigned tx_buffer_count(unsigned char chan);
+
+// tx_buffer_free:  free slots on chan
+unsigned tx_buffer_free(unsigned char chan);
 
 unsigned tx_buffer_lost();
 
