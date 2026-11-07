@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
+#include <sched.h>
 #include <thread>
 #include <zmq.h>
 #include <sys/time.h>
@@ -35,6 +37,19 @@ unsigned fill_index = 0;
 std::atomic<bool> msg_ready = true;
 void clear_msg(void*, void*) { msg_ready = true; }
 
+// Cores:  ZMQ's I/O thread (the TCP send) alone on one, this thread with the network interrupts
+// on the other
+const int IO_CPU   = 1;
+const int MAIN_CPU = 0;
+
+// pin_this_thread:  run the calling thread on cpu only
+static void pin_this_thread(int cpu){
+  cpu_set_t set;
+  CPU_ZERO(&set);
+  CPU_SET(cpu, &set);
+  pthread_setaffinity_np(pthread_self(), sizeof(set), &set);
+}
+
 int main(int argc, char* argv[]) {
   printf("INFO:  Starting pacman-dataserver...\n");
 
@@ -42,8 +57,11 @@ int main(int argc, char* argv[]) {
   void* ctx = zmq_ctx_new();
   if (!ctx) { perror("ERROR: zmq_ctx_new failed"); return EXIT_FAILURE; }
 
+  pin_this_thread(IO_CPU);  // ZMQ's threads, started by the first socket, inherit this core
   void* pub_socket = zmq_socket(ctx, ZMQ_PUB);
   if (!pub_socket) { perror("ERROR: zmq_socket failed"); zmq_ctx_term(ctx); return EXIT_FAILURE; }
+  pin_this_thread(MAIN_CPU);
+  printf("INFO:  ZMQ I/O thread on cpu%d, main thread on cpu%d.\n", IO_CPU, MAIN_CPU);
 
   if (zmq_setsockopt(pub_socket, ZMQ_SNDHWM, &PUB_HWM, sizeof(PUB_HWM)) != 0 ||
       zmq_setsockopt(pub_socket, ZMQ_LINGER, &PUB_LINGER, sizeof(PUB_LINGER)) != 0 ||
