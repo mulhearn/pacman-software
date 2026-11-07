@@ -62,6 +62,13 @@ do_install() {
 	install -d ${D}${sysconfdir}/init.d
 	install -m 0755 ${S}/utils/pacman_server.sh ${D}${sysconfdir}/init.d/pacman_server
 	install -m 0755 ${S}/utils/pacman_gpio_init.sh ${D}${sysconfdir}/init.d/pacman_gpio_init
+	# PACMAN tasks at the end of each boot (e.g. last-boot.txt on the boot partition):  its start links ship in
+	# the package, so a pacman-apps tarball update activates it too (update-rc.d runs only on a fresh rootfs)
+	install -m 0755 ${S}/utils/pacman_boot.sh ${D}${sysconfdir}/init.d/pacman_boot
+	for r in 2 3 4 5; do
+		install -d ${D}${sysconfdir}/rc$r.d
+		ln -sf ../init.d/pacman_boot ${D}${sysconfdir}/rc$r.d/S99pacman_boot
+	done
 	# sshd settings
 	install -d ${D}${sysconfdir}/ssh/sshd_config.d
 	install -m 0644 ${S}/etc/sshd_config.d/pacman.conf ${D}${sysconfdir}/ssh/sshd_config.d/
