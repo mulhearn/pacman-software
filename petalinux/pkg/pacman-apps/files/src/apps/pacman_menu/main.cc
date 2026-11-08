@@ -24,6 +24,7 @@
 #include "atc_menu.h"
 #include "iic_menu.h"
 #include "adc_menu.h"
+#include "la_menu.h"
 #include "hwcheck_menu.h"
 
 // *** LED ***
@@ -40,7 +41,7 @@ void main_menu(){
     printf("MAIN MENU:  choose an option:\r\n");
     printf("(x) exit (l) blink LEDs (g) global registers (s) toggle scratch registers \r\n");
     printf("(a) I2C menu (b) RX/TX menu (c) ATC menu (d) ADC menu \r\n");
-    printf("(e) ASIC menu (f) hardware check menu \r\n");
+    printf("(e) ASIC menu (f) hardware check menu (h) logic analyzer menu \r\n");
     int input = input_choice();
     if (input == INPUT_END)
       return;
@@ -76,6 +77,9 @@ void main_menu(){
       break;
     case 'f':
       hwcheck_menu();
+      break;
+    case 'h':
+      la_menu();
       break;
     default:
       printf("invalid selection...\r\n");

@@ -24,6 +24,7 @@
 #include "asic_menu.h"
 #include "atc_menu.h"
 #include "adc_menu.h"
+#include "la_menu.h"
 #include "hwcheck_menu.h"
 
 #define EMAC_DEVICE_ID      XPAR_XEMACPS_0_DEVICE_ID
@@ -115,7 +116,7 @@ void main_menu(){
     printf("(l) blink LEDs (g) read global status (s) toggle scratch (n) toggle enables \r\n");
     printf("(t) toggle dcache (m) read MAC from CPLD (k) toggle CPLD config \r\n");
     printf("(a) I2C menu (b) RX/TX menu (c) ATC menu (d) ADC menu \r\n");
-    printf("(e) single ASIC menu (f) hardware check menu \r\n");
+    printf("(e) single ASIC menu (f) hardware check menu (h) logic analyzer menu \r\n");
     int input = input_choice();
     if (input == INPUT_END)
       return;
@@ -160,6 +161,9 @@ void main_menu(){
       break;
     case 'f':
       hwcheck_menu();
+      break;
+    case 'h':
+      la_menu();
       break;
     default:
       printf("invalid selection...\r\n");

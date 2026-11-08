@@ -52,19 +52,26 @@ typedef struct {
   hw_u32_t acquire;        // 1:  acquisition enabled (0:  trigger only)
 } capture_config_t;
 
-// every clock, trigger on a rising edge of bit 31 (choose a constant bit for FORCE or cross trigger only), no
-// cross trigger, no post samples, acquisition enabled
-void capture_default_config(capture_config_t * c);
-// period, trigger, post and MODE (acquisition enable | mode_bits) of the capture in scope
+// Every clock, trigger on a rising edge of bit 31 (choose a constant bit for FORCE or cross trigger
+// only), no cross trigger, no post samples, acquisition enabled.
+  void capture_default_config(capture_config_t * c);
+
+// Period, trigger, post and MODE (acquisition enable | mode_bits) of the capture in scope
 void capture_configure(hw_addr_t scope, const capture_config_t * c, hw_u32_t mode_bits);
+
+// The configuration of the capture in scope, as in its registers.
+void capture_read_config(hw_addr_t scope, capture_config_t * c);
 void capture_arm(hw_addr_t scope);
 void capture_force(hw_addr_t scope);
 hw_val_t capture_status(hw_addr_t scope);
 hw_u32_t capture_depth(hw_addr_t scope);
 uint64_t capture_trig_ts(hw_addr_t scope);
-// wait for the capture to finish, up to timeout_us;  0 when done
+
+// Wait for the capture to finish, up to timeout_us.  0 when done
 int capture_wait_done(hw_addr_t scope, hw_u32_t timeout_us);
-// read the capture in time order (START, then DATA and NEXT):  up to max samples into buf;  returns the number read
+
+// read the capture in time order (START, then DATA and NEXT), up to max samples into buf.  Returns
+// the number read.
 hw_u32_t capture_read(hw_addr_t scope, hw_u32_t * buf, hw_u32_t max, hw_u32_t * trig_pos, uint64_t * trig_ts);
 
 #ifdef __cplusplus

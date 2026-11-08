@@ -148,6 +148,211 @@ static void ana_mon_dac(){
   }
 }
 
+
+// *** The test-DAC sawtooth and the ADC setups ***
+
+#define ANA_SAW_STEPS      32
+#define ANA_SAW_DAC_MAX    0x6000    // below the ADC's top (it clips near 0x6400)
+#define ANA_SAW_NOISE      16        // DN:  a step back of block means smaller than this is noise
+#define ANA_SAW_BLOCK      32        // samples per block mean (a DAC step is ~80 samples)
+#define ANA_SAW_MIN_RAMPS  3
+#define ANA_SAW_MAX_RAMPS  400       // give up after this many ramps without a done capture
+#define ADC_SETUP_NONE     0
+#define ADC_SETUP_DAC      1
+#define ADC_SETUP_MON      2
+#define ADC_NSETUP         3
+
+static const char * const ADC_SETUP_NAME[ADC_NSETUP] = {"none", "test DAC", "analog monitor"};
+static int G_ADC_SETUP = ADC_SETUP_NONE;
+static int G_ADC_TILE = 0;                    // 0-9:  TILE 1-10
+
+// Wake the ADC on its pins.
+static void adc_wake(){
+  axil_write_register(SCOPE_ADC + C_ADDR_ADC_CONFIG, ADC_CONFIG_ENABLE);
+  adc_select(ADC_MUX_PINS);
+  adc_init();
+  adc_set_sleep(0);
+}
+
+// The test-DAC setup;  lo, hi:  LOOK at DAC 0 and ANA_SAW_DAC_MAX.  Non-zero if the MUX refused.
+static int adc_setup_test_dac(double * lo, double * hi){
+  adc_wake();
+  iic_set_mux_open();
+  if (iic_set_mux_to_adc(IIC_MUX_DAC, 0) || iic_platform_status())
+    return 1;
+  iic_set_test_dac_dn(ANA_SAW_DAC_MAX, 0);
+  usleep(ADC_SETTLE_US);
+  *hi = ana_look_mean();
+  iic_set_test_dac_dn(0, 0);
+  usleep(ADC_SETTLE_US);
+  *lo = ana_look_mean();
+  double a = *lo < *hi ? *lo : *hi, b = *lo < *hi ? *hi : *lo;
+  adc_set_comparator((hw_u32_t) ((a + b) / 2), (hw_u32_t) ((b - a) / 8));
+  capture_config_t c;
+  capture_default_config(&c);
+  c.period = ADC_SAW_PERIOD;
+  c.trig_bit = ADC_CAP_LEVEL_BIT;
+  c.trig_edge = *hi > *lo ? CAP_EDGE_FALL : CAP_EDGE_RISE;
+  c.post = capture_depth(SCOPE_ADC) / 2;
+  capture_configure(SCOPE_ADC, &c, 0);
+  return 0;
+}
+
+// The analog-monitor setup.  Non-zero if the MUX refused.
+static int adc_setup_monitor(){
+  adc_wake();
+  iic_set_mux_open();
+  if (iic_set_mux_to_adc(IIC_MUX_TILE_1 + G_ADC_TILE, 0) || iic_platform_status())
+    return 1;
+  capture_config_t c;
+  capture_default_config(&c);          // every clock, trigger bit 31:  forced only
+  c.post = capture_depth(SCOPE_ADC) / 2;
+  capture_configure(SCOPE_ADC, &c, 0);
+  return 0;
+}
+
+// Configure the current setup (none:  nothing).
+static void adc_apply_setup(){
+  double lo, hi;
+  int refused = 0;
+  if (G_ADC_SETUP == ADC_SETUP_DAC) refused = adc_setup_test_dac(&lo, &hi);
+  if (G_ADC_SETUP == ADC_SETUP_MON) refused = adc_setup_monitor();
+  if (refused) printf("MUX refused or I2C error\r\n");
+}
+
+static void adc_print_setup(){
+  printf("ADC setup:  %s", ADC_SETUP_NAME[G_ADC_SETUP]);
+  if (G_ADC_SETUP == ADC_SETUP_MON) printf(",  TILE %d", G_ADC_TILE + 1);
+  printf("\r\n");
+}
+
+// Least-squares slope and largest residual of y over x, points first to n-1.
+static void ana_fit(const double * x, const double * y, int first, int n, double * slope,
+                    double * resid){
+  double sx = 0, sy = 0, sxx = 0, sxy = 0;
+  int m = n - first;
+  for (int i = first; i < n; i++){ sx += x[i]; sy += y[i]; sxx += x[i] * x[i]; sxy += x[i] * y[i]; }
+  *slope = (m * sxy - sx * sy) / (m * sxx - sx * sx);
+  double off = (sy - *slope * sx) / m;
+  *resid = 0;
+  for (int i = first; i < n; i++){
+    double r = y[i] - (*slope * x[i] + off);
+    if (r < 0) r = -r;
+    if (r > *resid) *resid = r;
+  }
+}
+
+static void ana_dac_sawtooth(){
+  double lo, hi, mv[ANA_SAW_STEPS + 1], dn[ANA_SAW_STEPS + 1];
+  if (adc_setup_test_dac(&lo, &hi)){
+    check_result("FAIL", "adc_sawtooth", "MUX refused or I2C error (ADC common on the test DAC)");
+    return;
+  }
+  for (int k = 0; k <= ANA_SAW_STEPS; k++){
+    hw_val_t d = ANA_SAW_DAC_MAX * k / ANA_SAW_STEPS;
+    iic_set_test_dac_dn(d, 0);
+    usleep(ADC_SETTLE_US);
+    mv[k] = d * 2500.0 / 65536;
+    dn[k] = ana_look_mean();
+  }
+  double gain, resid;
+  ana_fit(mv, dn, 1, ANA_SAW_STEPS + 1, &gain, &resid);
+
+  iic_set_test_dac_dn(0, 0);
+  usleep(ADC_SETTLE_US);
+  capture_arm(SCOPE_ADC);                 // at DAC 0:  the first ramp is recorded whole
+  int ramps = 0;
+  while (!(capture_status(SCOPE_ADC) & CAP_DONE) && ramps < ANA_SAW_MAX_RAMPS){
+    for (int k = 0; k < ANA_SAW_STEPS; k++)
+      iic_set_test_dac_dn(ANA_SAW_DAC_MAX * k / ANA_SAW_STEPS, 0);
+    ramps++;
+  }
+  iic_set_test_dac_dn(0, 0);
+  if (!(capture_status(SCOPE_ADC) & CAP_DONE)){
+    check_result("FAIL", "adc_sawtooth", "no capture after %d ramps", ramps);
+    return;
+  }
+  hw_u32_t n = capture_read(SCOPE_ADC, CAP_BUF, sizeof(CAP_BUF) / sizeof(CAP_BUF[0]), NULL, NULL);
+  int resets = 0, back = 0;
+  double half = (hi > lo ? hi - lo : lo - hi) / 2, prev = 0;
+  bool skip = true;                       // no comparison for the first block and after a reset
+  bool lead = false;                      // the buffer starts at the bottom of a ramp
+  for (hw_u32_t b = 0; b + ANA_SAW_BLOCK <= n; b += ANA_SAW_BLOCK){
+    double sum = 0, mn = ADC_CAP_DATA_MASK, mx = 0;
+    for (hw_u32_t i = b; i < b + ANA_SAW_BLOCK; i++){
+      double d = CAP_BUF[i] & ADC_CAP_DATA_MASK;
+      sum += d;
+      if (d < mn) mn = d;
+      if (d > mx) mx = d;
+    }
+    double mean = sum / ANA_SAW_BLOCK;
+    if (!b) lead = (hi > lo ? mean - lo : lo - mean) < half / 4;
+    if (mx - mn > half){                   // a reset inside the block
+      resets++;
+      skip = true;
+    } else {
+      if (!skip && prev - mean >= half) resets++;
+      else if (!skip && mean < prev - ANA_SAW_NOISE) back++;
+      skip = false;
+    }
+    prev = mean;
+  }
+  int full = resets > 0 ? resets - 1 + (lead ? 1 : 0) : 0;
+  double dev = 100 * (gain - ADC_SAW_DN_PER_MV) / ADC_SAW_DN_PER_MV;
+  bool ok = full >= ANA_SAW_MIN_RAMPS && back == 0 && dev <= ADC_SAW_GAIN_PCT
+            && dev >= -ADC_SAW_GAIN_PCT && resid <= ADC_SAW_RESIDUAL_DN;
+  check_result(ok ? "PASS" : "FAIL", "adc_sawtooth",
+               "%d full ramps (at least %d), %d steps back;  %.3f DN/mV (%.3f +/- %d%%), "
+               "residual %.1f DN (at most %d)", full, ANA_SAW_MIN_RAMPS, back, gain,
+               ADC_SAW_DN_PER_MV, ADC_SAW_GAIN_PCT, resid, ADC_SAW_RESIDUAL_DN);
+}
+
+void toggle_adc_setup(){
+  G_ADC_SETUP = (G_ADC_SETUP + 1) % ADC_NSETUP;
+  adc_apply_setup();
+  adc_print_setup();
+}
+
+void toggle_adc_tile(){
+  G_ADC_TILE = (G_ADC_TILE + 1) % 10;
+  if (G_ADC_SETUP == ADC_SETUP_MON) adc_apply_setup();
+  adc_print_setup();
+}
+
+void adc_arm(){
+  capture_arm(SCOPE_ADC);
+  printf("ADC armed (%s)\r\n", ADC_SETUP_NAME[G_ADC_SETUP]);
+}
+
+void adc_force(){
+  capture_force(SCOPE_ADC);
+  printf("ADC forced\r\n");
+}
+
+void adc_status(){
+  hw_val_t st = capture_status(SCOPE_ADC);
+  printf("ADC status 0x%x:  %s%s%s\r\n", (unsigned) st, (st & CAP_ARMED) ? "armed " : "",
+         (st & CAP_TRIGGERED) ? "triggered " : "", (st & CAP_DONE) ? "done" : "");
+  adc_print_setup();
+  if (!(st & CAP_DONE))
+    return;
+  hw_u32_t pos;
+  uint64_t ts;
+  hw_u32_t n = capture_read(SCOPE_ADC, CAP_BUF, sizeof(CAP_BUF) / sizeof(CAP_BUF[0]), &pos, &ts);
+  unsigned lo = ADC_CAP_DATA_MASK, hi = 0, ndof = 0;
+  double sum = 0;
+  for (hw_u32_t i = 0; i < n; i++){
+    unsigned d = CAP_BUF[i] & ADC_CAP_DATA_MASK;
+    if (CAP_BUF[i] & ADC_CAP_DOF) ndof++;
+    if (d < lo) lo = d;
+    if (d > hi) hi = d;
+    sum += d;
+  }
+  printf("%u samples, trigger at %u, timestamp %llu\r\n", (unsigned) n, (unsigned) pos,
+         (unsigned long long) ts);
+  if (n) printf("ADC (DN):  min %u, max %u, mean %.1f;  overflow %u\r\n", lo, hi, sum / n, ndof);
+}
+
 void adc_check(){
   hw_val_t config0 = axil_read_register(SCOPE_ADC + C_ADDR_ADC_CONFIG);
   hw_val_t status = axil_read_register(SCOPE_ADC + C_ADDR_ADC_STATUS);
@@ -170,6 +375,7 @@ void adc_check(){
   iic_set_test_dac_dn(0, 0);
   usleep(ADC_SETTLE_US);
   ana_mon_dac();
+  ana_dac_sawtooth();
   iic_set_test_dac_dn(0, 0);
   iic_set_mux_open();
   if (iic_platform_status())
@@ -226,6 +432,7 @@ void adc_menu(){
     printf("ADC MENU:  choose an option:\r\n");
     printf("(x) main menu (r) read ADC registers (s) toggle ADC sleep (e) toggle ADC enable \r\n");
     printf("(d) toggle DAC (c) check ADC (registers, test DAC) (m) check analog monitors \r\n");
+    printf("(u) toggle setup (t) toggle tile (a) arm (f) force (w) status \r\n");
     int input = input_choice();
     if (input == INPUT_END)
       return;
@@ -251,6 +458,21 @@ void adc_menu(){
       break;
     case 'm':
       adc_check_ana_mon(0x3FF);
+      break;
+    case 'u':
+      toggle_adc_setup();
+      break;
+    case 't':
+      toggle_adc_tile();
+      break;
+    case 'a':
+      adc_arm();
+      break;
+    case 'f':
+      adc_force();
+      break;
+    case 'w':
+      adc_status();
       break;
     default:
       printf("invalid selection...\r\n");

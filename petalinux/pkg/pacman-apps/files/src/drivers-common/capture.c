@@ -20,6 +20,16 @@ void capture_configure(hw_addr_t scope, const capture_config_t * c, hw_u32_t mod
   axil_write_register(scope + C_ADDR_CAP_POST, c->post);
 }
 
+void capture_read_config(hw_addr_t scope, capture_config_t * c){
+  hw_val_t trig = axil_read_register(scope + C_ADDR_CAP_TRIG);
+  c->period = axil_read_register(scope + C_ADDR_CAP_PERIOD);
+  c->trig_bit = trig & 0x1F;
+  c->trig_edge = (trig >> 8) & 0x3;
+  c->cross = (trig & CAP_TRIG_CROSS) ? 1 : 0;
+  c->post = axil_read_register(scope + C_ADDR_CAP_POST);
+  c->acquire = (axil_read_register(scope + C_ADDR_CAP_MODE) & CAP_MODE_ACQUIRE) ? 1 : 0;
+}
+
 void capture_arm(hw_addr_t scope){
   axil_write_register(scope + C_ADDR_CAP_ARM, 0);
 }
